@@ -221,7 +221,7 @@ class Server(threading.Thread):
 register_in_network = False
 
 
-Port = 1000
+Port = 1111
 
 serveur = Server(Port)
 serveur.start()
