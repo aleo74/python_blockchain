@@ -7,9 +7,10 @@ from socket import *
 import threading
 from blockchain import Blockchain
 from block import Block
+from wallet.wallet import generate_ECDSA_keys
 
-def create_chain_from_dump(chain_dump):
-    generated_blockchain = Blockchain()
+def create_chain_from_dump(chain_dump, walletKeyServer):
+    generated_blockchain = Blockchain(walletKeyServer)
     generated_blockchain.create_genesis_block()
     for idx, block_data in enumerate(chain_dump):
         if idx == 0:
@@ -67,10 +68,6 @@ class ErrorLevels:
     OK = "OK"
     ERROR = "ERROR"
 
-blockchain = Blockchain()
-blockchain.create_genesis_block()
-peers = set()
-
 class ClientThread(threading.Thread):
 
     def __init__(self, client, port, exit_callback, server = False):
@@ -104,14 +101,18 @@ class ClientThread(threading.Thread):
                                                 "peers": list(peers)})
                         self.clientsocket.send(str.encode(chain))
                     if msg['action'] == "new_transaction":
-                        tx_data = msg['data'][0]
-                        required_fields = ["author", "content"]
+                        tx_data = dict()
+                        if 'data' in msg:
+                            tx_data['data'] = dict()
+                            data = msg['data'][0]
+                            data["timestamp"] = time.time()
+                            tx_data['data'].update(data)
 
-                        for field in required_fields:
-                            if not tx_data[field]:
-                                self.clientsocket.send(b'Invalid transaction data')
-
-                        tx_data["timestamp"] = time.time()
+                        if 'transac' in msg:
+                            tx_data['transac'] = dict()
+                            transac = msg['transac'][0]
+                            transac["timestamp"] = time.time()
+                            tx_data['transac'].update(transac)
 
                         blockchain.add_new_transaction(tx_data)
                         self.clientsocket.send(b'Success')
@@ -160,6 +161,11 @@ class ClientThread(threading.Thread):
                             print("The block was discarded by the node")
 
                         print("Block added to the chain")
+                    if msg['action'] == 'get_block':
+                        if 'num_block' in msg:
+                            self.clientsocket.send(str.encode(json.dumps(blockchain.get_block_by_index(msg['num_block']))))
+                        if 'hash' in msg:
+                            self.clientsocket.send(str.encode(json.dumps(blockchain.find_block_by_hash(msg['hash']))))
                 elif len(r) == 0:
                     self.stop(ErrorLevels.ERROR, "La connection a été abandonnée")
         except ConnectionAbortedError:
@@ -178,9 +184,6 @@ class ClientThread(threading.Thread):
         self.running = False
         self.clientsocket.close()
         print(f"Fin de la communication avec {self.port}")
-
-
-
 
 class Server(threading.Thread):
     def __init__(self, Port):
@@ -217,12 +220,13 @@ class Server(threading.Thread):
     def close(self):
         self.running = False
 
-
+#il faut créer un wallet, ou demander l'adresse du wallet à créditer quand un block est miné
+walletKeyServer = generate_ECDSA_keys()
+blockchain = Blockchain(walletKeyServer)
+blockchain.create_genesis_block()
+peers = set()
 register_in_network = False
-
-
 Port = 1111
-
 serveur = Server(Port)
 serveur.start()
 
@@ -244,11 +248,13 @@ while True:
         if data:
             print(data)
             chain_dump = data['chain']
-            blockchain = create_chain_from_dump(chain_dump)
+            blockchain = create_chain_from_dump(chain_dump, walletKeyServer)
             peers.update(data['peers'])
             print('Registration on the network successful')
             register_in_network = True
         s.close()
+    if msg == 'chain_len':
+        print(len(blockchain.chain))
     if msg == 'close':
         serveur.close()
 

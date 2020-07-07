@@ -1,15 +1,19 @@
 from block import Block
 import time
+from transaction import Vout, Transaction
+
 
 class Blockchain:
     difficulty = 1
 
-    def __init__(self):
-        self.unconfirmed_transactions = []
+    def __init__(self, address_wallet_miner):
+        self.unconfirmed_transactions = {}
+        self.unconfirmed_transactions
+        self.address_wallet_miner = address_wallet_miner
         self.chain = []
 
     def create_genesis_block(self):
-        genesis_block = Block(0, [], 0, "0")
+        genesis_block = Block(0, self.address_wallet_miner, [], 0, "0")
         genesis_block.hash = genesis_block.compute_hash()
         self.chain.append(genesis_block)
 
@@ -45,7 +49,14 @@ class Blockchain:
         return computed_hash
 
     def add_new_transaction(self, transaction):
-        self.unconfirmed_transactions.append(transaction)
+        if not self.unconfirmed_transactions:
+            self.unconfirmed_transactions['data'] = []
+            self.unconfirmed_transactions['transac'] = []
+        if 'data' in transaction:
+            self.unconfirmed_transactions['data'].append(dict(transaction['data']))
+        if 'transac' in transaction:
+            print(transaction)
+            self.unconfirmed_transactions['transac'].append(dict(transaction['transac']))
 
     @classmethod
     def is_valid_proof(cls, block, block_hash):
@@ -77,17 +88,18 @@ class Blockchain:
         return result
 
     def mine(self):
-        """
-        This function serves as an interface to add the pending
-        transactions to the blockchain by adding them to the block
-        and figuring out Proof Of Work.
-        """
+
         if not self.unconfirmed_transactions:
             return False
 
         last_block = self.get_last_block
-
+        rewardT = Vout(self.address_wallet_miner, 20).__dict__
+        reward = {}
+        reward['transac'] = Transaction([], rewardT).__dict__
+        self.add_new_transaction(reward)
+        print(self.unconfirmed_transactions)
         new_block = Block(index=last_block.index + 1,
+                          miner=self.address_wallet_miner,
                           transactions=self.unconfirmed_transactions,
                           timestamp=time.time(),
                           previous_hash=last_block.hash)
@@ -98,3 +110,11 @@ class Blockchain:
         self.unconfirmed_transactions = []
 
         return True
+
+    def get_block_by_index(self, index):
+        return self.chain[index].__dict__
+
+    def find_block_by_hash(self, hash):
+        for block in self.chain:
+            if block.hash == hash:
+                return block.__dict__
