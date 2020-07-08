@@ -55,8 +55,12 @@ class Blockchain:
         if 'data' in transaction:
             self.unconfirmed_transactions['data'].append(dict(transaction['data']))
         if 'transac' in transaction:
-            print(transaction)
-            self.unconfirmed_transactions['transac'].append(dict(transaction['transac']))
+            transacVout = Vout(transaction['transac']['to'], transaction['transac']['amount']).__dict__
+            transacTemp = {}
+            transacTemp['transac'] = Transaction([], transacVout).__dict__
+            self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
+        if 'miningReward' in transaction:
+            self.unconfirmed_transactions['transac'].append(dict(transaction['miningReward']))
 
     @classmethod
     def is_valid_proof(cls, block, block_hash):
@@ -95,7 +99,7 @@ class Blockchain:
         last_block = self.get_last_block
         rewardT = Vout(self.address_wallet_miner, 20).__dict__
         reward = {}
-        reward['transac'] = Transaction([], rewardT).__dict__
+        reward['miningReward'] = Transaction([], rewardT).__dict__
         self.add_new_transaction(reward)
         print(self.unconfirmed_transactions)
         new_block = Block(index=last_block.index + 1,
