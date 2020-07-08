@@ -2,6 +2,7 @@ from socket import *
 import time
 import base64
 import ecdsa
+import json
 
 
 def wallet():
@@ -14,8 +15,8 @@ def wallet():
     if response == "1":
         # Generate new wallet
         print("""=========================================\n
-IMPORTANT: save this credentials or you won't be able to recover your wallet\n
-=========================================\n""")
+			  IMPORTANT: save this credentials or you won't be able to recover your wallet\n
+			  =========================================\n""")
         generate_ECDSA_keys()
     elif response == "2":
         addr_from = input("From: introduce your wallet address (public key)\n")
@@ -32,12 +33,6 @@ IMPORTANT: save this credentials or you won't be able to recover your wallet\n
         check_transactions()
 
 def send_transaction(addr_from, private_key, addr_to, amount):
-    """Sends your transaction to different nodes. Once any of the nodes manage
-    to mine a block, your transaction will be added to the blockchain. Despite
-    that, there is a low chance your transaction gets canceled due to other nodes
-    having a longer chain. So make sure your transaction is deep into the chain
-    before claiming it as approved!
-    """
     # For fast debugging REMOVE LATER
     private_key="181f2448fa4636315032e15bb9cbc3053e10ed062ab0b2680a37cd8cb51f53f2"
     amount="3000"
@@ -51,25 +46,30 @@ def send_transaction(addr_from, private_key, addr_to, amount):
         s.connect(server_address)
         msg = '{"action": "new_transaction", "transac":[{ "from" : "'+addr_from+'", "to" : "'+addr_to+'", "amount": "'+amount+'", "signature" : "'+signature.decode()+'", "message": "'+message+'"}]}'
         s.send(msg.encode())
-
-        #res = requests.post(url, json=payload, headers=headers)
-        #print(res.text)
     else:
         print("Wrong address or key length! Verify and try again.")
 
 def check_transactions():
-    """Retrieve the entire blockchain. With this you can check your
-    wallets balance. If the blockchain is to long, it may take some time to load.
-    """
     s = socket(AF_INET, SOCK_STREAM)
     server_address = ('localhost', 1111)
     s.connect(server_address)
     msg = '{"action": "get_chain"}'
     s.send(msg.encode())
     data = recvall(s)
+    amount = 0.0;
     if data:
-        print(len(data))
-        print('Received', repr(data))
+        all_block = json.loads(data)
+		#print(len(data))
+		#print('Received', repr(data))
+        for block in all_block['chain']:
+            if block['index'] == 0:
+                continue
+            print(block)
+            for transac in block['transactions']['transac']:
+                if transac['vout']['receiver'] == "SD5IZAuFixM3PTmkm5ShvLm1tbDNOmVlG7tg6F5r7VHxPNWkNKbzZfa+JdKmfBAIhWs9UKnQLOOL1U+R3WxcsQ==":
+                    amount += float(transac['vout']['amount'])
+        print(amount)
+				
 
 def generate_ECDSA_keys():
     """This function takes care of creating your private and public (your address) keys.
