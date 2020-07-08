@@ -101,18 +101,18 @@ class ClientThread(threading.Thread):
                                                 "peers": list(peers)})
                         self.clientsocket.send(str.encode(chain))
                     if msg['action'] == "new_transaction":
-                        tx_data = dict()
+                        tx_data = {}
                         if 'data' in msg:
                             tx_data['data'] = dict()
                             data = msg['data'][0]
                             data["timestamp"] = time.time()
-                            tx_data['data'].update(data)
+                            tx_data['data'].append(data)
 
                         if 'transac' in msg:
-                            tx_data['transac'] = dict()
-                            transac = msg['transac'][0]
-                            transac["timestamp"] = time.time()
-                            tx_data['transac'].update(transac)
+                            tx_data['transac'] = []
+                            for transac in msg['transac']:
+                                transac["timestamp"] = time.time()
+                                tx_data['transac'].append(transac)
 
                         blockchain.add_new_transaction(tx_data)
                         self.clientsocket.send(b'Success')

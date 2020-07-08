@@ -55,10 +55,12 @@ class Blockchain:
         if 'data' in transaction:
             self.unconfirmed_transactions['data'].append(dict(transaction['data']))
         if 'transac' in transaction:
-            transacVout = Vout(transaction['transac']['to'], transaction['transac']['amount']).__dict__
-            transacTemp = {}
-            transacTemp['transac'] = Transaction([], transacVout).__dict__
-            self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
+            print(transaction)
+            for transacLine in transaction['transac']:
+                transacVout = Vout(transacLine['to'], transacLine['amount']).__dict__
+                transacTemp = {}
+                transacTemp['transac'] = Transaction([], transacVout).__dict__
+                self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
         if 'miningReward' in transaction:
             self.unconfirmed_transactions['transac'].append(dict(transaction['miningReward']))
 

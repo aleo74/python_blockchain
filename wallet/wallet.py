@@ -13,7 +13,6 @@ def wallet():
         2. Send coins to another wallet
         3. Check transactions\n""")
     if response == "1":
-        # Generate new wallet
         print("""=========================================\n
 			  IMPORTANT: save this credentials or you won't be able to recover your wallet\n
 			  =========================================\n""")
@@ -40,11 +39,12 @@ def send_transaction(addr_from, private_key, addr_to, amount):
     addr_to="SD5IZAuFixM3PTmkm5ShvLm1tbDNOmVlG7tg6F5r7VHxPNWkNKbzZfa+JdKmfBAIhWs9UKnQLOOL1U+R3WxcsQ=="
 
     if len(private_key) == 64:
+        amountN = float(amount) * -1
         signature, message = sign_ECDSA_msg(private_key)
         s = socket(AF_INET, SOCK_STREAM)
         server_address = ('localhost', 1111)
         s.connect(server_address)
-        msg = '{"action": "new_transaction", "transac":[{ "from" : "'+addr_from+'", "to" : "'+addr_to+'", "amount": "'+amount+'", "signature" : "'+signature.decode()+'", "message": "'+message+'"}]}'
+        msg = '{"action": "new_transaction", "transac":[{ "from" : "'+addr_from+'", "to" : "'+addr_to+'", "amount": "'+amount+'", "signature" : "'+signature.decode()+'", "message": "'+message+'"},{ "from" : "' + addr_from + '", "to" : "' + addr_to + '", "amount": "' + str(amountN) + '", "signature" : "' + signature.decode() + '", "message": "' + message + '"}]}'
         s.send(msg.encode())
     else:
         print("Wrong address or key length! Verify and try again.")
@@ -72,12 +72,6 @@ def check_transactions():
 				
 
 def generate_ECDSA_keys():
-    """This function takes care of creating your private and public (your address) keys.
-    It's very important you don't lose any of them or those wallets will be lost
-    forever. If someone else get access to your private key, you risk losing your coins.
-    private_key: str
-    public_ley: base64 (to make it shorter)
-    """
     sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1) #this is your sign (private key)
     private_key = sk.to_string().hex() #convert your private key to hex
     vk = sk.get_verifying_key() #this is your verification key (public key)
