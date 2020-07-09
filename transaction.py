@@ -90,7 +90,6 @@ def select_outputs_greedy(unspent, min_value):
     key_func = lambda utxo: utxo.amount
     greaters.sort(key=key_func)
     if greaters:
-        # 非空。寻找最小的greater。
         min_greater = greaters[0]
         change = min_greater.amount - min_value
         return [min_greater], change

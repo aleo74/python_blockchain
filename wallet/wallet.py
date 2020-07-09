@@ -44,7 +44,7 @@ def send_transaction(addr_from, private_key, addr_to, amount):
         s = socket(AF_INET, SOCK_STREAM)
         server_address = ('localhost', 1111)
         s.connect(server_address)
-        msg = '{"action": "new_transaction", "transac":[{ "from" : "'+addr_from+'", "to" : "'+addr_to+'", "amount": "'+amount+'", "signature" : "'+signature.decode()+'", "message": "'+message+'"},{ "from" : "' + addr_from + '", "to" : "' + addr_to + '", "amount": "' + str(amountN) + '", "signature" : "' + signature.decode() + '", "message": "' + message + '"}]}'
+        msg = '{"action": "new_transaction", "transac":[{ "from" : "'+addr_from+'", "to" : "'+addr_to+'", "amount": "'+amount+'", "signature" : "'+signature.decode()+'", "message": "'+message+'"}]}'
         s.send(msg.encode())
     else:
         print("Wrong address or key length! Verify and try again.")
