@@ -12,11 +12,14 @@ class Vin():
 
 
 class Vout():
-    def __init__(self, receiver, amount):
+    def __init__(self, receiver, amount, signature, message, timestamp):
         self.receiver = receiver
         self.amount = amount
+        self.signature = signature
+        self.message = message
+        self.timestamp = timestamp
         self.hash = hashlib.sha256(
-            (str(time.time()) + str(self.receiver) + str(self.amount)).encode('utf-8')).hexdigest()
+            (str(time.time()) + str(self.receiver) + str(self.message) + str(self.signature) + str(self.amount)).encode('utf-8')).hexdigest()
         # self.lockSig = lockSig
 
     @classmethod
@@ -54,7 +57,6 @@ class Transaction():
             amount = int(amount)
         unspents = Vout.get_unspent(from_addr)
         ready_utxo, change = select_outputs_greedy(unspents, amount)
-        print('ready_utxo', ready_utxo[0].to_dict())
         vin = ready_utxo
         vout = []
         vout.append(Vout(to_addr, amount))
@@ -63,14 +65,6 @@ class Transaction():
         tx_dict = tx.to_dict()
         #UnTransactionDB().insert(tx_dict)
         return tx_dict
-
-    @staticmethod
-    def unblock_spread(untx):
-        blockchain().add_new_transaction(untx)
-
-    @staticmethod
-    def blocked_spread(txs):
-        blockchain().blocked_transactions(txs)
 
     def to_dict(self):
         dt = self.__dict__

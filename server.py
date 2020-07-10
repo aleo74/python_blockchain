@@ -1,13 +1,13 @@
 # coding: utf-8
-from utils import *
 import json
 import time
-import sys
-from socket import *
+from mySocket import MySocket
+from socket import timeout, gethostname, gethostbyname
 import threading
 from blockchain import Blockchain
 from block import Block
-from wallet.wallet import generate_ECDSA_keys
+import base64
+import ecdsa
 
 def create_chain_from_dump(chain_dump, walletKeyServer):
     generated_blockchain = Blockchain(walletKeyServer)
@@ -32,13 +32,12 @@ def consensus():
     longest_chain = None
     current_len = len(blockchain.chain)
     for node in peers:
-        s = socket(AF_INET, SOCK_STREAM)
+        s = MySocket()
         print("envoie sur le noeud :", node)
-        server_address = ("localhost", 1111)
-        s.connect(server_address)
+        s.connectTo(server_address)
         msg = '{"action": "get_chain"}'
         s.send(msg.encode())
-        r = s.recv(1024)
+        r = s.recvall()
         data = json.loads(r.decode("utf-8"))
         if data:
             length = data['length']
@@ -53,36 +52,63 @@ def consensus():
         return True
     return False
 
+def generate_ECDSA_keys():
+    #need to test if a file exist, and use it
+    sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)  # this is your sign (private key)
+    private_key = sk.to_string().hex()  # convert your private key to hex
+    vk = sk.get_verifying_key()  # this is your verification key (public key)
+    public_key = vk.to_string().hex()
+    # we are going to encode the public key to make it shorter
+    public_key = base64.b64encode(bytes.fromhex(public_key))
+
+    filename = input("Write the name of your new address: ") + ".txt"
+    with open(filename, "w") as f:
+        f.write("Private key: {0}\nWallet address / Public key: {1}".format(private_key, public_key.decode()))
+    print("Your new address and private key are now in the file {0}".format(filename))
+    return public_key.decode()
+
 def announce_new_block(block):
 
     for peer in peers:
-        s = socket(AF_INET, SOCK_STREAM)
-        server_address = ("localhost", 1111)
+
+        s = MySocket()
         my_new_block = json.dumps(block.__dict__, sort_keys=True)
         msg = '{"action" : "add_block", "data" : '+my_new_block+'}'
-        s.connect(server_address)
-        s.send(msg.encode())
+        s.connectTo(peer)
+        s.sendMsg(msg)
         s.close()
 
 class ErrorLevels:
     OK = "OK"
     ERROR = "ERROR"
 
-class ClientThread(threading.Thread):
+# Fixme : need a way to move this on mySocket class
+def recvall(sock):
+    BUFF_SIZE = 1024  # 1 KiB
+    data = b''
+    while True:
+        part = sock.recv(BUFF_SIZE)
+        data += part
+        if len(part) < BUFF_SIZE:
+            # either 0 or end of data
+            break
+    return data
 
-    def __init__(self, client, port, exit_callback, server = False):
+class ClientThread(threading.Thread, MySocket):
+
+    def __init__(self, socket, client, exit_callback, server = False):
         threading.Thread.__init__(self)
-        self.clientsocket = client
-        self.port = port
+        self.clientsocket = socket
+        self.client = client
         self.exit_callback = exit_callback
         self.running = True
         self.server = server
-        print("[+] Nouveau thread pour %s %s" % (self.clientsocket, self.port,))
+        print("[+] Nouveau thread pour %s %s" % (self.clientsocket, self.client,))
 
     def run(self):
         try:
             while self.running:
-                r = self.clientsocket.recv(2048)
+                r = recvall(self.clientsocket)
                 if r:
                     msg = json.loads(r.decode("utf-8"))
                     if not msg['action']:
@@ -103,10 +129,10 @@ class ClientThread(threading.Thread):
                     if msg['action'] == "new_transaction":
                         tx_data = {}
                         if 'data' in msg:
-                            tx_data['data'] = dict()
-                            data = msg['data'][0]
-                            data["timestamp"] = time.time()
-                            tx_data['data'].append(data)
+                            tx_data['data'] = []
+                            for data in msg['data']:
+                                data["timestamp"] = time.time()
+                                tx_data['data'].append(data)
 
                         if 'transac' in msg:
                             tx_data['transac'] = []
@@ -132,7 +158,7 @@ class ClientThread(threading.Thread):
                             self.clientsocket.send(str.encode("Block #{} is mined.".format(blockchain.get_last_block.index)))
                     if msg['action'] == 'register_node':
                         print('Un nouveau serveur se joins à la blockchain !')
-                        data = msg['data'][0]
+                        data = msg['data'][0] # fixme
                         if not data['IP']:
                             print('error')
                             self.clientsocket.send(b'error')
@@ -146,7 +172,6 @@ class ClientThread(threading.Thread):
                                                 "peers": list(peers)})
                         self.clientsocket.send(str.encode(chain))
                     if msg['action'] == 'add_block':
-                        print("nous avons reçu un nouveau block !")
                         block_data = msg['data']
                         block = Block(block_data["index"],
                                       block_data["transactions"],
@@ -183,14 +208,14 @@ class ClientThread(threading.Thread):
     def close_connection(self):
         self.running = False
         self.clientsocket.close()
-        print(f"Fin de la communication avec {self.port}")
+        print(f"Fin de la communication avec {self.client}")
 
 class Server(threading.Thread):
     def __init__(self, Port):
         threading.Thread.__init__(self)
         self.client_pool = []
         self.running = True
-        self.socket = socket(AF_INET, SOCK_STREAM)
+        self.socket = MySocket()
         self.socket.bind(('localhost', Port))
         self.socket.settimeout(0.5)
 
@@ -209,10 +234,10 @@ class Server(threading.Thread):
         self.socket.listen(10000)
         while self.running:
             try:
-                ip, port = self.socket.accept()
+                idSocket, client = self.socket.accept()
             except timeout:
                 continue
-            newthread = ClientThread(ip, port, self.client_handling_stopped)
+            newthread = ClientThread(idSocket, client, self.client_handling_stopped)
             newthread.start()
             self.client_pool.append(newthread)
             self.log_connection_amount()
@@ -220,7 +245,7 @@ class Server(threading.Thread):
     def close(self):
         self.running = False
 
-#il faut créer un wallet, ou demander l'adresse du wallet à créditer quand un block est miné
+
 walletKeyServer = generate_ECDSA_keys()
 blockchain = Blockchain(walletKeyServer)
 blockchain.create_genesis_block()
@@ -237,7 +262,7 @@ while True:
             print(peer)
     if msg == 'register_to_network' and not register_in_network:
         addr = input(">> ")
-        s = socket(AF_INET, SOCK_STREAM)
+        s = MySocket()
         server_address = ('localhost', 1111)
         s.connect(server_address)
         hostname = gethostname()
@@ -246,7 +271,6 @@ while True:
         r = s.recv(1024)
         data = json.loads(r.decode("utf-8"))
         if data:
-            print(data)
             chain_dump = data['chain']
             blockchain = create_chain_from_dump(chain_dump, walletKeyServer)
             peers.update(data['peers'])

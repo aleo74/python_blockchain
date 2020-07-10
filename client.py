@@ -1,10 +1,10 @@
 # coding: utf-8
 
-import socket
+import mySocket
 import threading
 
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s = mySocket.socket(mySocket.AF_INET, mySocket.SOCK_STREAM)
 server_address = ('localhost', 1111)
 s.connect(server_address)
 

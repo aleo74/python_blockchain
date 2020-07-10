@@ -53,14 +53,14 @@ class Blockchain:
             self.unconfirmed_transactions['data'] = []
             self.unconfirmed_transactions['transac'] = []
         if 'data' in transaction:
-            self.unconfirmed_transactions['data'].append(dict(transaction['data']))
+            self.unconfirmed_transactions['data'].append(transaction['data'])
         if 'transac' in transaction:
             print(transaction)
             for transacLine in transaction['transac']:
-                transacVout = Vout(transacLine['to'], transacLine['amount']).__dict__
+                transacVout = Vout(transacLine['to'], transacLine['amount'], transacLine['signature'], transacLine['message'], transacLine['timestamp']).__dict__
                 transacTemp = {}
-                transacTemp['transac'] = Transaction([], transacVout)
-                transacTemp['transac'].transfer(transacLine['from'], transacLine['to'], transacLine['amount'])
+                transacTemp['transac'] = Transaction([], transacVout).__dict__
+                #transacTemp['transac'].transfer(transacLine['from'], transacLine['to'], transacLine['amount'])
                 self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
         if 'miningReward' in transaction:
             self.unconfirmed_transactions['transac'].append(dict(transaction['miningReward']))
@@ -100,11 +100,10 @@ class Blockchain:
             return False
 
         last_block = self.get_last_block
-        rewardT = Vout(self.address_wallet_miner, 20).__dict__
+        rewardT = Vout(self.address_wallet_miner, 20, "", "", time.time()).__dict__
         reward = {}
         reward['miningReward'] = Transaction([], rewardT).__dict__
         self.add_new_transaction(reward)
-        print(self.unconfirmed_transactions)
         new_block = Block(index=last_block.index + 1,
                           miner=self.address_wallet_miner,
                           transactions=self.unconfirmed_transactions,
