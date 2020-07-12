@@ -2,7 +2,7 @@
 import json
 import time
 from mySocket import MySocket
-from socket import timeout, gethostname, gethostbyname
+from socket import *
 import threading
 from blockchain import Blockchain
 from block import Block
@@ -13,6 +13,7 @@ def create_chain_from_dump(chain_dump, walletKeyServer):
     generated_blockchain = Blockchain(walletKeyServer)
     generated_blockchain.create_genesis_block()
     for idx, block_data in enumerate(chain_dump):
+        print("create a new chain from remote server")
         if idx == 0:
             continue  # skip genesis block
         block = Block(block_data["index"],
@@ -84,7 +85,7 @@ class ErrorLevels:
 
 # Fixme : need a way to move this on mySocket class
 def recvall(sock):
-    BUFF_SIZE = 1024  # 1 KiB
+    BUFF_SIZE = 2048  # 1 KiB
     data = b''
     while True:
         part = sock.recv(BUFF_SIZE)
@@ -167,9 +168,9 @@ class ClientThread(threading.Thread, MySocket):
                         chain_data = []
                         for block in blockchain.chain:
                             chain_data.append(block.__dict__)
-                            chain = json.dumps({"length": len(chain_data),
-                                                "chain": chain_data,
-                                                "peers": list(peers)})
+                        chain = json.dumps({"length": len(chain_data),
+                                            "chain": chain_data,
+                                            "peers": list(peers)})
                         self.clientsocket.send(str.encode(chain))
                     if msg['action'] == 'add_block':
                         block_data = msg['data']
@@ -261,14 +262,14 @@ while True:
         for peer in peers:
             print(peer)
     if msg == 'register_to_network' and not register_in_network:
-        addr = input(">> ")
-        s = MySocket()
-        server_address = ('localhost', 1111)
+        addr = input("IP of a node server >> ")
+        s = socket(AF_INET, SOCK_STREAM)
+        server_address = (addr, 1111)
         s.connect(server_address)
         hostname = gethostname()
         msg = '{"action": "register_node", "data": [{"IP": "'+gethostbyname(hostname)+'", "port": "1111"}]}'
         s.send(msg.encode())
-        r = s.recv(1024)
+        r = recvall(s)
         data = json.loads(r.decode("utf-8"))
         if data:
             chain_dump = data['chain']

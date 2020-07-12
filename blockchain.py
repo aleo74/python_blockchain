@@ -15,7 +15,7 @@ class Blockchain:
         self.miningJob = False
 
     def create_genesis_block(self):
-        genesis_block = Block(0, self.address_wallet_miner, [], 0, "0")
+        genesis_block = Block(0, "", [], 0, "0")
         genesis_block.hash = genesis_block.compute_hash()
         self.chain.append(genesis_block)
 
@@ -130,7 +130,6 @@ class Blockchain:
         reward['miningReward'] = Transaction([], rewardT).__dict__
         self.add_new_transaction(reward)
         new_block = Block(index=last_block.index + 1,
-                          miner=self.address_wallet_miner,
                           transactions=self.unconfirmed_transactions,
                           timestamp=time.time(),
                           previous_hash=last_block.hash)

@@ -46,7 +46,7 @@ Mine it ! (on client):
 ## How to add a new node ?
 
 Change the value of port
-Start a new new console :
+Start a new console :
 ```sh
 py server.py
 ```
