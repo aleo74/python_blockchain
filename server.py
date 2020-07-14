@@ -9,11 +9,11 @@ from block import Block
 import base64
 import ecdsa
 
+
 def create_chain_from_dump(chain_dump, walletKeyServer):
     generated_blockchain = Blockchain(walletKeyServer)
     generated_blockchain.create_genesis_block()
     for idx, block_data in enumerate(chain_dump):
-        print("create a new chain from remote server")
         if idx == 0:
             continue  # skip genesis block
         block = Block(block_data["index"],
@@ -26,6 +26,7 @@ def create_chain_from_dump(chain_dump, walletKeyServer):
         if not added:
             raise Exception("The chain dump is tampered!!")
     return generated_blockchain
+
 
 def consensus():
     global blockchain
@@ -53,35 +54,42 @@ def consensus():
         return True
     return False
 
-def generate_ECDSA_keys():
-    #need to test if a file exist, and use it
-    sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)  # this is your sign (private key)
-    private_key = sk.to_string().hex()  # convert your private key to hex
-    vk = sk.get_verifying_key()  # this is your verification key (public key)
-    public_key = vk.to_string().hex()
-    # we are going to encode the public key to make it shorter
-    public_key = base64.b64encode(bytes.fromhex(public_key))
 
+def generate_ECDSA_keys():
     filename = input("Write the name of your new address: ") + ".txt"
-    with open(filename, "w") as f:
-        f.write("Private key: {0}\nWallet address / Public key: {1}".format(private_key, public_key.decode()))
-    print("Your new address and private key are now in the file {0}".format(filename))
-    return public_key.decode()
+    try:
+        with open(filename, "r") as f:
+            lines = f.read().splitlines()
+            public_key  = lines[1].split(": ")[1]
+    except FileNotFoundError:
+        sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)  # this is your sign (private key)
+        private_key = sk.to_string().hex()  # convert your private key to hex
+        vk = sk.get_verifying_key()  # this is your verification key (public key)
+        public_key = vk.to_string().hex()
+        # we are going to encode the public key to make it shorter
+        public_key = base64.b64encode(bytes.fromhex(public_key))
+        with open(filename, "w") as f:
+            f.write("Private key: {0}\nWallet address / Public key: {1}".format(private_key, public_key.decode()))
+        print("Your new address and private key are now in the file {0}".format(filename))
+        print("copy this file to a secure directory, and delete your private key from the original")
+        public_key = public_key.decode()
+    return public_key
+
 
 def announce_new_block(block):
-
     for peer in peers:
-
         s = MySocket()
         my_new_block = json.dumps(block.__dict__, sort_keys=True)
-        msg = '{"action" : "add_block", "data" : '+my_new_block+'}'
+        msg = '{"action" : "add_block", "data" : ' + my_new_block + '}'
         s.connectTo(peer)
         s.sendMsg(msg)
         s.close()
 
+
 class ErrorLevels:
     OK = "OK"
     ERROR = "ERROR"
+
 
 # Fixme : need a way to move this on mySocket class
 def recvall(sock):
@@ -95,16 +103,17 @@ def recvall(sock):
             break
     return data
 
+
 class ClientThread(threading.Thread, MySocket):
 
-    def __init__(self, socket, client, exit_callback, server = False):
+    def __init__(self, socket, client, exit_callback, server=False):
         threading.Thread.__init__(self)
         self.clientsocket = socket
         self.client = client
         self.exit_callback = exit_callback
         self.running = True
         self.server = server
-        print("[+] Nouveau thread pour %s %s" % (self.clientsocket, self.client,))
+        #print("[+] Nouveau thread pour %s %s" % (self.clientsocket, self.client,))
 
     def run(self):
         try:
@@ -150,16 +159,17 @@ class ClientThread(threading.Thread, MySocket):
                         if not result:
                             self.clientsocket.send(b'No transactions to mine')
                         else:
-                            #send block the others servers
+                            # send block the others servers
                             chain_length = len(blockchain.chain)
                             consensus()
                             if chain_length == len(blockchain.chain):
                                 # announce the recently mined block to the network
                                 announce_new_block(blockchain.get_last_block)
-                            self.clientsocket.send(str.encode("Block #{} is mined.".format(blockchain.get_last_block.index)))
+                            self.clientsocket.send(
+                                str.encode("Block #{} is mined.".format(blockchain.get_last_block.index)))
                     if msg['action'] == 'register_node':
                         print('Un nouveau serveur se joins à la blockchain !')
-                        data = msg['data'][0] # fixme
+                        data = msg['data'][0]  # fixme
                         if not data['IP']:
                             print('error')
                             self.clientsocket.send(b'error')
@@ -189,17 +199,16 @@ class ClientThread(threading.Thread, MySocket):
                         print("Block added to the chain")
                     if msg['action'] == 'get_block':
                         if 'num_block' in msg:
-                            self.clientsocket.send(str.encode(json.dumps(blockchain.get_block_by_index(msg['num_block']))))
+                            self.clientsocket.send(
+                                str.encode(json.dumps(blockchain.get_block_by_index(msg['num_block']))))
                         if 'hash' in msg:
                             self.clientsocket.send(str.encode(json.dumps(blockchain.find_block_by_hash(msg['hash']))))
                 elif len(r) == 0:
                     self.stop(ErrorLevels.ERROR, "La connection a été abandonnée")
-        except ConnectionAbortedError:
-            if self.running:
-                self.stop(ErrorLevels.ERROR, "La connection a été abandonnée")
-            else:
-                return
-        self.stop(ErrorLevels.OK, "Le client a fermé la connection")
+
+        except Exception as e:
+            #print("error while  " + str(e))
+            self.stop(ErrorLevels.OK, "Le client a fermé la connection")
 
     def stop(self, error_level, error_msg):
         self.running = False
@@ -209,7 +218,8 @@ class ClientThread(threading.Thread, MySocket):
     def close_connection(self):
         self.running = False
         self.clientsocket.close()
-        print(f"Fin de la communication avec {self.client}")
+        #print(f"Fin de la communication avec {self.client}")
+
 
 class Server(threading.Thread):
     def __init__(self, Port):
@@ -221,7 +231,6 @@ class Server(threading.Thread):
         self.socket.settimeout(0.5)
 
     def client_handling_stopped(self, client, error_level, error_msg):
-        print(f"Le gérant de {client.port} s'est arrêté avec le niveau d'erreur {error_level} ({error_msg})")
         self.clean_up()
 
     def clean_up(self):
@@ -261,13 +270,16 @@ while True:
     if msg == 'see_peers':
         for peer in peers:
             print(peer)
+    if msg == "see_clients":
+        for client in serveur.client_pool:
+            print(client)
     if msg == 'register_to_network' and not register_in_network:
         addr = input("IP of a node server >> ")
         s = socket(AF_INET, SOCK_STREAM)
         server_address = (addr, 1111)
         s.connect(server_address)
         hostname = gethostname()
-        msg = '{"action": "register_node", "data": [{"IP": "'+gethostbyname(hostname)+'", "port": "1111"}]}'
+        msg = '{"action": "register_node", "data": [{"IP": "' + gethostbyname(hostname) + '", "port": "1111"}]}'
         s.send(msg.encode())
         r = recvall(s)
         data = json.loads(r.decode("utf-8"))
@@ -282,4 +294,3 @@ while True:
         print(len(blockchain.chain))
     if msg == 'close':
         serveur.close()
-
