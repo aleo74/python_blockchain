@@ -207,7 +207,6 @@ class ClientThread(threading.Thread, MySocket):
                     self.stop(ErrorLevels.ERROR, "La connection a été abandonnée")
 
         except Exception as e:
-            #print("error while  " + str(e))
             self.stop(ErrorLevels.OK, "Le client a fermé la connection")
 
     def stop(self, error_level, error_msg):
@@ -218,7 +217,6 @@ class ClientThread(threading.Thread, MySocket):
     def close_connection(self):
         self.running = False
         self.clientsocket.close()
-        #print(f"Fin de la communication avec {self.client}")
 
 
 class Server(threading.Thread):
@@ -283,6 +281,7 @@ while True:
         s.send(msg.encode())
         r = recvall(s)
         data = json.loads(r.decode("utf-8"))
+
         if data:
             chain_dump = data['chain']
             blockchain = create_chain_from_dump(chain_dump, walletKeyServer)

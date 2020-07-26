@@ -5,7 +5,6 @@ import threading
 
 
 s = mySocket.socket(mySocket.AF_INET, mySocket.SOCK_STREAM)
-
 server_address = ('localhost', 1111)
 s.connect(server_address)
 
