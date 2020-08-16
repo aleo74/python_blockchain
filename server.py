@@ -8,6 +8,8 @@ from blockchain import Blockchain
 from block import Block
 import base64
 import ecdsa
+from flask import Flask, redirect, render_template, request
+import requests
 
 
 def create_chain_from_dump(chain_dump, walletKeyServer):
@@ -36,7 +38,7 @@ def consensus():
     for node in peers:
         s = MySocket()
         print("envoie sur le noeud :", node)
-        s.connectTo(server_address)
+        s.connectTo(node)
         msg = '{"action": "get_chain"}'
         s.send(msg.encode())
         r = s.recvall()
@@ -151,7 +153,7 @@ class ClientThread(threading.Thread, MySocket):
                                 tx_data['transac'].append(transac)
 
                         blockchain.add_new_transaction(tx_data)
-                        self.clientsocket.send(b'Success')
+                        self.clientsocket.send(bytes([blockchain.get_last_block.index]))
                     if msg['action'] == "pending_tx":
                         self.clientsocket.send(str.encode(json.dumps(blockchain.unconfirmed_transactions)))
                     if msg['action'] == "mine":
@@ -198,11 +200,19 @@ class ClientThread(threading.Thread, MySocket):
 
                         print("Block added to the chain")
                     if msg['action'] == 'get_block':
+                        print(msg)
                         if 'num_block' in msg:
                             self.clientsocket.send(
                                 str.encode(json.dumps(blockchain.get_block_by_index(msg['num_block']))))
                         if 'hash' in msg:
                             self.clientsocket.send(str.encode(json.dumps(blockchain.find_block_by_hash(msg['hash']))))
+                    if msg['action'] == 'see_peers':
+                        peer = ''.join(peers)
+                        print(peer)
+                        self.clientsocket.send(b''.peer)
+                    if msg['action'] == 'chain_len':
+                        print(len(blockchain.chain))
+                        self.clientsocket.send(b''.len(blockchain.chain))
                 elif len(r) == 0:
                     self.stop(ErrorLevels.ERROR, "La connection a été abandonnée")
 
@@ -227,8 +237,10 @@ class Server(threading.Thread):
         self.socket = MySocket()
         self.socket.bind(('localhost', Port))
         self.socket.settimeout(0.5)
+        self.register_in_network = False
 
     def client_handling_stopped(self, client, error_level, error_msg):
+        print(client.client.gethostname())
         self.clean_up()
 
     def clean_up(self):
@@ -250,6 +262,27 @@ class Server(threading.Thread):
             self.client_pool.append(newthread)
             self.log_connection_amount()
 
+    def auto_peer(self, addr):
+        print('auto peer')
+        s = socket(AF_INET, SOCK_STREAM)
+        server_address = (addr, 1111)
+        s.connect(server_address)
+        hostname = "127.0.0.1"
+        msg = '{"action": "register_node", "data": [{"IP": "' + hostname + '", "port": "1111"}]}'
+        s.send(msg.encode())
+        r = recvall(s)
+        data = json.loads(r.decode("utf-8"))
+        print(data)
+
+        if data:
+            chain_dump = data['chain']
+            global blockchain
+            global peers
+            blockchain = create_chain_from_dump(chain_dump, walletKeyServer)
+            peers.update(data['peers'])
+            self.register_in_network = True
+        s.close()
+
     def close(self):
         self.running = False
 
@@ -262,34 +295,4 @@ register_in_network = False
 Port = 1111
 serveur = Server(Port)
 serveur.start()
-
-while True:
-    msg = input(">> ")
-    if msg == 'see_peers':
-        for peer in peers:
-            print(peer)
-    if msg == "see_clients":
-        for client in serveur.client_pool:
-            print(client)
-    if msg == 'register_to_network' and not register_in_network:
-        addr = input("IP of a node server >> ")
-        s = socket(AF_INET, SOCK_STREAM)
-        server_address = (addr, 1111)
-        s.connect(server_address)
-        hostname = gethostname()
-        msg = '{"action": "register_node", "data": [{"IP": "' + gethostbyname(hostname) + '", "port": "1111"}]}'
-        s.send(msg.encode())
-        r = recvall(s)
-        data = json.loads(r.decode("utf-8"))
-
-        if data:
-            chain_dump = data['chain']
-            blockchain = create_chain_from_dump(chain_dump, walletKeyServer)
-            peers.update(data['peers'])
-            print('Registration on the network successful')
-            register_in_network = True
-        s.close()
-    if msg == 'chain_len':
-        print(len(blockchain.chain))
-    if msg == 'close':
-        serveur.close()
+#serveur.auto_peer("127.0.0.1")

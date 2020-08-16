@@ -73,7 +73,7 @@ def index():
 def connect():
     public_addr = request.form["public"]
     private_key = request.form["private"]
-    my_wallet = Wallet("51.15.157.164", public_addr, private_key)
+    my_wallet = Wallet("127.0.0.1", public_addr, private_key)
 
     if my_wallet.connect_wallet():
         my_wallet.check_transactions()
@@ -100,7 +100,12 @@ def send():
 
 #@app.route('/post_manga', method=['POST'])
 
-#@app.route('/get_manga', method=['POST'])
+@app.route('/get_manga', method=['POST'])
+def get_manga():
+    # vérification de l'adresse
+    return True
+
+
 
 def timestamp_to_string(epoch_time):
     return datetime.datetime.fromtimestamp(epoch_time).strftime('%H:%M')
