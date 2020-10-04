@@ -4,7 +4,11 @@ import base64
 import ecdsa
 import codecs
 import json
+import sys
+import urllib.request
 
+version = 'v0.2'
+hash = ''
 
 class Wallet():
 
@@ -27,11 +31,12 @@ class Wallet():
             for block in all_block['chain']:
                 if block['index'] == 0:
                     continue
-                transaction = json.loads(block['transactions'])
-                for transac in transaction['transac']:
+                for transac in block['transactions']['transac']:
+                    print(transac)
                     if transac['vout']['receiver'] == self.publicKey:
                         amount += float(transac['vout']['amount'])
-                    if transac['vout']['sender'] == self.publicKey:
+                    signature, message = self.sign_ECDSA_msg(str(transac['vout']['timestamp']))
+                    if signature == transac['vout']['signature'] and message == transac['vout']['message']:
                         amount -= float(transac['vout']['amount'])
             self.amount = amount
         print(self.amount)
@@ -61,30 +66,44 @@ class Wallet():
 
         if public_key == self.publicKey:
             self.connect = True
-            print("ok")
+            #print("ok")
 
     def send_transaction(self, addr_to, amount):
-
         if len(self.privateKey) == 64 and self.amount <= float(amount):
             timeS = str(round(time.time()))
             signature, message = self.sign_ECDSA_msg(timeS)
             s = socket(AF_INET, SOCK_STREAM)
             server_address = ('localhost', 1111)
             s.connect(server_address)
-            print(type(str(time.time())))
-            print(type(signature))
-            msg = '{"action": "new_transaction", "transac":[{ "timestamp": "'+str(time.time())+'", "from" : "' + self.publicKey + '", "to" : "' + addr_to + '", "amount": "' + amount + '", "signature" : "' + signature.decode("utf-8") + '", "message": "' + message + '"}]}'
+            msg = '{"action": "new_transaction", "transac":[{ "timestamp": "'+timeS+'", "from" : "' + self.publicKey + '", "to" : "' + addr_to + '", "amount": "' + amount + '", "signature" : "' + signature.decode() + '", "message": "' + message.decode() + '"}]}'
             s.send(msg.encode())
-            print(msg)
         else:
-            print("Wrong address or key length! Verify and try again.")
+            return False
 
     def sign_ECDSA_msg(self, timeS):
         message = timeS
-        bmessage = message.encode()
+        message = message.encode()
         sk = ecdsa.SigningKey.from_string(bytes.fromhex(self.privateKey), curve=ecdsa.SECP256k1)
-        signature = base64.b64encode(sk.sign(bmessage))
+        signature = base64.b64encode(sk.sign(message))
         return signature, message
+
+    def get_block(self, id_block, id):
+        s = socket(AF_INET, SOCK_STREAM)
+        server_address = ('localhost', 1111)
+        s.connect(server_address)
+        msg = '{"action": "get_block", "num_block": '+id_block+'}'
+        s.send(msg.encode())
+        data = self.recvall(s)
+        print(data)
+        if data and self.connect:
+            string = json.loads(data)
+            my_data = json.loads(string['transactions'])
+            for id_manga in my_data['data'][0]:
+                if id_manga['id'] == id:
+                    if 'address' in id_manga:
+                        self.send_transaction(id_manga['address'], '0.002')
+                        manga = id_manga
+            print(json.dumps(manga))
 
     def recvall(self, sock):
         BUFF_SIZE = 1024  # 1 KiB
@@ -97,44 +116,43 @@ class Wallet():
                 break
         return data
 
+    def post_data(self, data):
+        if data and self.connect:
+            s = socket(AF_INET, SOCK_STREAM)
+            server_address = ('127.0.0.1', 1111)
+            s.connect(server_address)
+            msg = '{"action": "new_transaction", "data": ['+data+']}'
+            s.send(msg.encode())
+            data1 = s.recv(1000000)
+            if data1:
+                print(int.from_bytes(data1, byteorder='big'))
 
-print("""=========================================\n
-        Wallet - v0.0.0\n
-       =========================================\n\n
-        Make sure you are using the latest version or you may end in
-        a parallel chain.\n\n\n""")
-# need a request to server for the wallet version supported
 
-response = input("""What do you want to do?
-        1. Generate new wallet
-        2. Connect to a wallet\n""")
 
-if response == "2":
-    public_addr = input("From: introduce your wallet address (public key)\n")
-    private_key = input("Introduce your private key\n")
-    # For fast debugging
-    #public_addr = ""
-    #private_key = ""
+with urllib.request.urlopen("http://brandon-corporation.local/api/wallet_laravel_version") as url:
+    s = url.read()
+    response = json.loads(s)
 
-    my_wallet = Wallet(public_addr, private_key)
-    my_wallet.connect_wallet()
-if response == "1":
-    my_wallet = Wallet()
-    my_wallet.create_new_wallet()
+if response:
+    if response['version'] == version:
+        if response['hash'] == hash:
+            public_addr = sys.argv[2]
+            private_key = sys.argv[1]
 
-response = 0
-while response not in ["1", "2", "3"]:
-    response = input("""What do you want to do?
-        1. Send coins to another wallet
-        2. Check transactions\n""")
-    if response == "1":
-        addr_to = input("To: introduce destination wallet address\n")
-        amount = input("Amount: number stating how much do you want to send\n")
-        print("=========================================\n\n")
-        print("Is everything correct?\n")
-        print("To: {0}\nAmount: {1}\n".format(addr_to, amount))
-        response = input("y/n\n")
-        if response.lower() == "y":
-            my_wallet.send_transaction(addr_to, amount)
-    elif response == "2":
-        my_wallet.check_transactions()
+            index_block = sys.argv[3]
+            id = sys.argv[4]
+
+            if len(sys.argv) >= 6:
+                data = json.dumps(json.loads(base64.b64decode(sys.argv[5])))
+            else :
+                data = False
+
+            my_wallet = Wallet(public_addr, private_key)
+            my_wallet.connect_wallet()
+
+            if not data:
+                my_wallet.get_block(index_block, id)
+
+            else:
+                my_wallet.post_data(data)
+
