@@ -27,12 +27,11 @@ class Wallet():
             for block in all_block['chain']:
                 if block['index'] == 0:
                     continue
-                for transac in block['transactions']['transac']:
-                    print(transac)
+                transaction = json.loads(block['transactions'])
+                for transac in transaction['transac']:
                     if transac['vout']['receiver'] == self.publicKey:
                         amount += float(transac['vout']['amount'])
-                    signature, message = self.sign_ECDSA_msg(str(transac['vout']['timestamp']))
-                    if signature == transac['vout']['signature'] and message == transac['vout']['message']:
+                    if transac['vout']['sender'] == self.publicKey:
                         amount -= float(transac['vout']['amount'])
             self.amount = amount
         print(self.amount)
@@ -65,9 +64,6 @@ class Wallet():
             print("ok")
 
     def send_transaction(self, addr_to, amount):
-        #For fast debugging
-        #amount = ""
-        #addr_to = ""
 
         if len(self.privateKey) == 64 and self.amount <= float(amount):
             timeS = str(round(time.time()))
@@ -75,11 +71,9 @@ class Wallet():
             s = socket(AF_INET, SOCK_STREAM)
             server_address = ('localhost', 1111)
             s.connect(server_address)
-            print(timeS)
-            print(self.publicKey)
-            print(addr_to)
-            print(message)
-            msg = '{"action": "new_transaction", "transac":[{ "timestamp": "'+timeS+'", "from" : "' + self.publicKey + '", "to" : "' + addr_to + '", "amount": "' + amount + '", "signature" : "' + signature.decode() + '", "message": "' + message.decode() + '"}]}'
+            print(type(str(time.time())))
+            print(type(signature))
+            msg = '{"action": "new_transaction", "transac":[{ "timestamp": "'+str(time.time())+'", "from" : "' + self.publicKey + '", "to" : "' + addr_to + '", "amount": "' + amount + '", "signature" : "' + signature.decode("utf-8") + '", "message": "' + message + '"}]}'
             s.send(msg.encode())
             print(msg)
         else:
@@ -87,9 +81,9 @@ class Wallet():
 
     def sign_ECDSA_msg(self, timeS):
         message = timeS
-        message = message.encode()
+        bmessage = message.encode()
         sk = ecdsa.SigningKey.from_string(bytes.fromhex(self.privateKey), curve=ecdsa.SECP256k1)
-        signature = base64.b64encode(sk.sign(message))
+        signature = base64.b64encode(sk.sign(bmessage))
         return signature, message
 
     def recvall(self, sock):
@@ -121,6 +115,7 @@ if response == "2":
     # For fast debugging
     #public_addr = ""
     #private_key = ""
+
     my_wallet = Wallet(public_addr, private_key)
     my_wallet.connect_wallet()
 if response == "1":

@@ -8,21 +8,23 @@ from blockchain import Blockchain
 from block import Block
 import base64
 import ecdsa
-from flask import Flask, redirect, render_template, request
-import requests
+import sqlite3
+from sqlite3 import Error
+import pathlib
 
 
 def create_chain_from_dump(chain_dump, walletKeyServer):
     generated_blockchain = Blockchain(walletKeyServer)
-    generated_blockchain.create_genesis_block()
     for idx, block_data in enumerate(chain_dump):
-        if idx == 0:
-            continue  # skip genesis block
         block = Block(block_data["index"],
-                      block_data["transactions"],
+                      json.loads(block_data["transactions"]),
                       block_data["timestamp"],
                       block_data["previous_hash"],
+                      "",
                       block_data["nonce"])
+        if block.index == 0:
+            continue  # skip genesis block
+
         proof = block_data['hash']
         added = generated_blockchain.add_block(block, proof)
         if not added:
@@ -115,7 +117,6 @@ class ClientThread(threading.Thread, MySocket):
         self.exit_callback = exit_callback
         self.running = True
         self.server = server
-        #print("[+] Nouveau thread pour %s %s" % (self.clientsocket, self.client,))
 
     def run(self):
         try:
@@ -132,11 +133,10 @@ class ClientThread(threading.Thread, MySocket):
                         break
                     if msg['action'] == "get_chain":
                         chain_data = []
-                        for block in blockchain.chain:
-                            chain_data.append(block.__dict__)
-                            chain = json.dumps({"length": len(chain_data),
-                                                "chain": chain_data,
-                                                "peers": list(peers)})
+                        chain_data.append(blockchain.get_chain())
+                        chain = json.dumps({"length": len(chain_data),
+                                            "chain": blockchain.get_chain(),
+                                            "peers": list(peers)})
                         self.clientsocket.send(str.encode(chain))
                     if msg['action'] == "new_transaction":
                         tx_data = {}
@@ -152,36 +152,33 @@ class ClientThread(threading.Thread, MySocket):
                                 transac["timestamp"] = time.time()
                                 tx_data['transac'].append(transac)
 
-                        blockchain.add_new_transaction(tx_data)
+                        mining = blockchain.add_new_transaction(tx_data)
                         self.clientsocket.send(bytes([blockchain.get_last_block.index]))
-                    if msg['action'] == "pending_tx":
-                        self.clientsocket.send(str.encode(json.dumps(blockchain.unconfirmed_transactions)))
-                    if msg['action'] == "mine":
-                        result = blockchain.mine()
-                        if not result:
-                            self.clientsocket.send(b'No transactions to mine')
-                        else:
-                            # send block the others servers
+                        if mining:
+                            blockchain.mine()
                             chain_length = len(blockchain.chain)
                             consensus()
                             if chain_length == len(blockchain.chain):
                                 # announce the recently mined block to the network
                                 announce_new_block(blockchain.get_last_block)
-                            self.clientsocket.send(
-                                str.encode("Block #{} is mined.".format(blockchain.get_last_block.index)))
+
+                    if msg['action'] == "pending_tx":
+                        self.clientsocket.send(str.encode(json.dumps(blockchain.unconfirmed_transactions)))
                     if msg['action'] == 'register_node':
                         print('Un nouveau serveur se joins à la blockchain !')
+
                         data = msg['data'][0]  # fixme
                         if not data['IP']:
                             print('error')
                             self.clientsocket.send(b'error')
                             break
+                        print('ici')
                         peers.add(data['IP'])
+                        print(peers)
                         chain_data = []
-                        for block in blockchain.chain:
-                            chain_data.append(block.__dict__)
+                        chain_data.append(blockchain.get_chain())
                         chain = json.dumps({"length": len(chain_data),
-                                            "chain": chain_data,
+                                            "chain": blockchain.get_chain(),
                                             "peers": list(peers)})
                         self.clientsocket.send(str.encode(chain))
                     if msg['action'] == 'add_block':
@@ -200,7 +197,6 @@ class ClientThread(threading.Thread, MySocket):
 
                         print("Block added to the chain")
                     if msg['action'] == 'get_block':
-                        print(msg)
                         if 'num_block' in msg:
                             self.clientsocket.send(
                                 str.encode(json.dumps(blockchain.get_block_by_index(msg['num_block']))))
@@ -240,7 +236,6 @@ class Server(threading.Thread):
         self.register_in_network = False
 
     def client_handling_stopped(self, client, error_level, error_msg):
-        print(client.client.gethostname())
         self.clean_up()
 
     def clean_up(self):
@@ -262,13 +257,13 @@ class Server(threading.Thread):
             self.client_pool.append(newthread)
             self.log_connection_amount()
 
-    def auto_peer(self, addr):
+    def auto_peer(self, addr, port):
         print('auto peer')
         s = socket(AF_INET, SOCK_STREAM)
         server_address = (addr, 1111)
         s.connect(server_address)
-        hostname = "127.0.0.1"
-        msg = '{"action": "register_node", "data": [{"IP": "' + hostname + '", "port": "1111"}]}'
+        hostname = "127.0.0.1" # IP su serveur
+        msg = '{"action": "register_node", "data": [{"IP": "' + hostname + '", "port": "' + str(port) + '"}]}'
         s.send(msg.encode())
         r = recvall(s)
         data = json.loads(r.decode("utf-8"))
@@ -278,7 +273,8 @@ class Server(threading.Thread):
             chain_dump = data['chain']
             global blockchain
             global peers
-            blockchain = create_chain_from_dump(chain_dump, walletKeyServer)
+            KeyServer = blockchain.address_wallet_miner
+            blockchain = create_chain_from_dump(chain_dump, KeyServer)
             peers.update(data['peers'])
             self.register_in_network = True
         s.close()
@@ -286,13 +282,60 @@ class Server(threading.Thread):
     def close(self):
         self.running = False
 
+# SQLite3
 
-walletKeyServer = generate_ECDSA_keys()
-blockchain = Blockchain(walletKeyServer)
-blockchain.create_genesis_block()
-peers = set()
-register_in_network = False
-Port = 1111
-serveur = Server(Port)
-serveur.start()
-#serveur.auto_peer("127.0.0.1")
+sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS blocks (
+                                    id integer PRIMARY KEY,
+                                    num_block integer NOT NULL,
+                                    hash text,
+                                    transactions text,
+                                    timestamp text,
+                                    previous_hash text not null,
+                                    nonce integer
+                                );"""
+
+def create_connection(db_file):
+    """ create a database connection to a SQLite database """
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+    except Error as e:
+        print(e)
+    return conn
+
+def create_table(conn, create_table_sql):
+    """ create a table from the create_table_sql statement
+    :param conn: Connection object
+    :param create_table_sql: a CREATE TABLE statement
+    :return:
+    """
+    try:
+        c = conn.cursor()
+        c.execute(create_table_sql)
+        return True
+    except Error as e:
+        print(e)
+
+second_server = 0
+if second_server == 0:
+    fichier_db = r".\db\pythonsqlite.db"
+else:
+    fichier_db = r".\db\pythonsqlite2.db"
+conn = create_connection(fichier_db)
+if conn is not None:
+    if create_table(conn, sql_create_tasks_table):
+        walletKeyServer = generate_ECDSA_keys()
+        blockchain = Blockchain(walletKeyServer, fichier_db)
+        blockchain.create_genesis_block()
+        peers = set()
+        register_in_network = False
+        if second_server == 0:
+            Port = 1111
+            serveur = Server(Port)
+            serveur.start()
+            #serveur.auto_peer("127.0.0.1", Port)
+        else:
+            Port = 1110
+            serveur = Server(Port)
+            serveur.start()
+            serveur.auto_peer("127.0.0.1", Port)

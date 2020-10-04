@@ -94,13 +94,15 @@ class Wallet():
         msg = '{"action": "get_block", "num_block": '+id_block+'}'
         s.send(msg.encode())
         data = self.recvall(s)
+        print(data)
         if data and self.connect:
-            my_data = json.loads(data)
-            for id_manga in my_data['transactions']['data']:
-                if id_manga[0]['id'] == id:
-                    if 'address' in id_manga[0]:
-                        self.send_transaction(id_manga[0]['address'], '0.002')
-                        manga = id_manga[0]
+            string = json.loads(data)
+            my_data = json.loads(string['transactions'])
+            for id_manga in my_data['data'][0]:
+                if id_manga['id'] == id:
+                    if 'address' in id_manga:
+                        self.send_transaction(id_manga['address'], '0.002')
+                        manga = id_manga
             print(json.dumps(manga))
 
     def recvall(self, sock):

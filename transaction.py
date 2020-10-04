@@ -12,14 +12,15 @@ class Vin():
 
 
 class Vout():
-    def __init__(self, receiver, amount, signature, message, timestamp):
+    def __init__(self, receiver, sender, amount, signature, message, timestamp):
         self.receiver = receiver
+        self.sender = sender
         self.amount = amount
         self.signature = signature
         self.message = message
         self.timestamp = timestamp
         self.hash = hashlib.sha256(
-            (str(time.time()) + str(self.receiver) + str(self.message) + str(self.signature) + str(self.amount)).encode('utf-8')).hexdigest()
+            (str(time.time()) + str(self.receiver) + str(self.sender) + str(self.message) + str(self.signature) + str(self.amount)).encode('utf-8')).hexdigest()
         # self.lockSig = lockSig
 
     @classmethod
