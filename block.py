@@ -18,8 +18,4 @@ class Block:
         """
 
         block_string = json.dumps(self.__dict__, sort_keys=True)
-
-        print('-------Block in string to hash-------')
-        print(block_string)
-        print('-------/Block in string to hash-------')
         return sha256(block_string.encode()).hexdigest()

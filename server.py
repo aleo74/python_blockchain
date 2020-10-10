@@ -267,7 +267,6 @@ class Server(threading.Thread):
         s.send(msg.encode())
         r = recvall(s)
         data = json.loads(r.decode("utf-8"))
-        print(data)
 
         if data:
             chain_dump = data['chain']

@@ -37,11 +37,9 @@ class Blockchain:
     def add_block(self, block, proof):
         previous_hash = self.get_last_block.hash
         if previous_hash != block.previous_hash:
-            print('previous hash faux')
             return False
 
         if not Blockchain.is_valid_proof(block, proof):
-            print('block non valide')
             return False
 
         block.hash = proof
