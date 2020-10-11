@@ -206,9 +206,9 @@ class ClientThread(threading.Thread, MySocket):
                         peer = ''.join(peers)
                         print(peer)
                         self.clientsocket.send(b''.peer)
-                    if msg['action'] == 'chain_len':
-                        print(len(blockchain.chain))
-                        self.clientsocket.send(b''.len(blockchain.chain))
+                    if msg['action'] == "chain_len":
+                        len_chain = str(blockchain.get_len_chain())
+                        self.clientsocket.send(str.encode(len_chain))
                 elif len(r) == 0:
                     self.stop(ErrorLevels.ERROR, "La connection a été abandonnée")
 
