@@ -13,6 +13,7 @@ class Blockchain:
         self.unconfirmed_transactions
         self.address_wallet_miner = address_wallet_miner
         self.chain = []
+        self.last_id_block = 0
         self.conn = sqlite3.connect(fichier_db, check_same_thread=False, isolation_level=None)
         self.miningJob = False
 
@@ -37,11 +38,9 @@ class Blockchain:
     def add_block(self, block, proof):
         previous_hash = self.get_last_block.hash
         if previous_hash != block.previous_hash:
-            print('previous hash faux')
             return False
 
         if not Blockchain.is_valid_proof(block, proof):
-            print('block non valide')
             return False
 
         block.hash = proof
@@ -178,3 +177,6 @@ class Blockchain:
         for block in myBlock:
             list_block.append(Block(block[1], block[3], block[4], block[5], block[2], block[6]).__dict__)
         return list_block
+
+    def get_len_chain(self):
+        return self.conn.execute('''SELECT MAX(id) FROM blocks''').fetchone()[0]
