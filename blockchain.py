@@ -75,10 +75,11 @@ class Blockchain:
             self.unconfirmed_transactions['data'].append(transaction['data'])
         if 'transac' in transaction:
             for transacLine in transaction['transac']:
-                transacVout = Vout(transacLine['to'],transacLine['from'], transacLine['amount'], transacLine['signature'], transacLine['message'], transacLine['timestamp']).__dict__
-                transacTemp = {}
-                transacTemp['transac'] = Transaction([], transacVout).__dict__
-                #transacTemp['transac'].transfer(transacLine['from'], transacLine['to'], transacLine['amount'])
+                if float(transacLine['amount']) > 0:
+                    transacVout = Vout(transacLine['to'],transacLine['from'], transacLine['amount'], transacLine['signature'], transacLine['message'], transacLine['timestamp']).__dict__
+                    transacTemp = {}
+                    transacTemp['transac'] = Transaction([], transacVout).__dict__
+                    #transacTemp['transac'].transfer(transacLine['from'], transacLine['to'], transacLine['amount'])
                 self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
         if 'miningReward' in transaction:
             self.unconfirmed_transactions['transac'].append(dict(transaction['miningReward']))
@@ -144,7 +145,7 @@ class Blockchain:
             return False
 
         last_block = self.get_last_block
-        rewardT = Vout(self.address_wallet_miner, "", 20, "", "", time.time()).__dict__
+        rewardT = Vout(self.address_wallet_miner, "", self.rewardCalcul(), "", "", time.time()).__dict__
         reward = {}
         reward['miningReward'] = Transaction([], rewardT).__dict__
         self.add_new_transaction(reward)
@@ -159,6 +160,17 @@ class Blockchain:
         self.miningJob = False
 
         return True
+
+    def rewardCalcul(self):
+        len_chain = self.get_len_chain()
+        max_reward = 100
+        div = 1
+        amount = 0
+        while (200000 * div) <= len_chain:
+            max_reward = max_reward / 2
+            amount = amount + (200000 * max_reward)
+            div = div + 1
+        return max_reward
 
     def get_block_by_index(self, index):
         myBlock = self.conn.execute('''SELECT * FROM blocks WHERE num_block=?''', (index,)).fetchone()
@@ -180,3 +192,4 @@ class Blockchain:
 
     def get_len_chain(self):
         return self.conn.execute('''SELECT MAX(id) FROM blocks''').fetchone()[0]
+

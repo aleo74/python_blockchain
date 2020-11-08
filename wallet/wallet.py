@@ -4,6 +4,9 @@ import base64
 import ecdsa
 import codecs
 import json
+import sqlite3
+from sqlite3 import Error
+from time import sleep
 
 
 class Wallet():
@@ -33,8 +36,19 @@ class Wallet():
                         amount += float(transac['vout']['amount'])
                     if transac['vout']['sender'] == self.publicKey:
                         amount -= float(transac['vout']['amount'])
-            self.amount = amount
-        print(self.amount)
+        msg = '{"action": "pending_tx"}'
+        s.send(msg.encode())
+        pendingData = self.recvall(s)
+        if pendingData and self.connect:
+            dataPending = json.loads(pendingData)
+            if "transac" in dataPending:
+                for transac in dataPending['transac']:
+                    if transac['vout']['receiver'] == self.publicKey:
+                        amount += float(transac['vout']['amount'])
+                    if transac['vout']['sender'] == self.publicKey:
+                        amount -= float(transac['vout']['amount'])
+        self.amount = amount
+        return self.amount
 
     def create_new_wallet(self):
         sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)  # this is your sign (private key)
@@ -92,6 +106,7 @@ class Wallet():
         while True:
             part = sock.recv(BUFF_SIZE)
             data += part
+            sleep(0.005)
             if len(part) < BUFF_SIZE:
                 # either 0 or end of data
                 break
@@ -137,4 +152,5 @@ while response not in ["1", "2", "3"]:
         if response.lower() == "y":
             my_wallet.send_transaction(addr_to, amount)
     elif response == "2":
-        my_wallet.check_transactions()
+        amount = my_wallet.check_transactions()
+        print(f"{amount:.4f}")
