@@ -18,8 +18,8 @@ class Blockchain:
         self.miningJob = False
 
     def create_genesis_block(self):
-        genesis_block = Block(0, "", "", 0, "0")
-        genesis_block.hash = genesis_block.compute_hash()
+        genesis_block = Block(0, "", "", "0")
+        genesis_block.hash = self.proof_of_work(genesis_block)
         self.conn.execute('''
                 INSERT INTO blocks (num_block,hash,transactions,timestamp, previous_hash,nonce)
                         VALUES(?,?,?,?,?,?)

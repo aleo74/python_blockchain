@@ -11,6 +11,7 @@ import ecdsa
 import sqlite3
 from sqlite3 import Error
 import pathlib
+import os
 
 
 def create_chain_from_dump(chain_dump, walletKeyServer):
@@ -320,6 +321,8 @@ if second_server == 0:
     fichier_db = r".\db\pythonsqlite.db"
 else:
     fichier_db = r".\db\pythonsqlite2.db"
+if os.path.exists(fichier_db):
+    os.remove(fichier_db)
 conn = create_connection(fichier_db)
 if conn is not None:
     if create_table(conn, sql_create_tasks_table):
