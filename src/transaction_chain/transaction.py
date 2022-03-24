@@ -27,7 +27,6 @@ class Vout():
     def get_unspent(cls, addr):
         """
         Exclude all consumed VOUT, get unconsumed VOUT
-
         """
         unspent = []
         all_tx = []
