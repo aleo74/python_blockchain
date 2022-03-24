@@ -1,31 +1,31 @@
 import sys
-from block import Block
+from block.block import Block
 import time
-from transaction import Vout, Transaction
+from transaction_chain.transaction import Vout, Transaction
 import sqlite3
 import json
+
 
 class Blockchain:
     difficulty = 1
 
-    def __init__(self, address_wallet_miner, fichier_db): #= r".\db\pythonsqlite2.db"
+    def __init__(self, address_wallet_miner, fichier_db):
         self.unconfirmed_transactions = {}
-        self.unconfirmed_transactions
         self.address_wallet_miner = address_wallet_miner
         self.chain = []
         self.last_id_block = 0
         self.conn = sqlite3.connect(fichier_db, check_same_thread=False, isolation_level=None)
+        self.fichier = fichier_db
         self.miningJob = False
 
     def create_genesis_block(self):
         genesis_block = Block(0, "", "", "0")
         genesis_block.hash = self.proof_of_work(genesis_block)
-        self.conn.execute('''
+        test = self.conn.execute('''
                 INSERT INTO blocks (num_block,hash,transactions,timestamp, previous_hash,nonce)
                         VALUES(?,?,?,?,?,?)
                           ''', (
-        genesis_block.index, genesis_block.hash, json.dumps(genesis_block.transactions), genesis_block.timestamp, genesis_block.previous_hash, genesis_block.nonce))
-        #self.chain.append(genesis_block)
+            genesis_block.index, genesis_block.hash, json.dumps(genesis_block.transactions), genesis_block.timestamp, genesis_block.previous_hash, genesis_block.nonce))
 
     @property
     def get_last_block(self):
@@ -35,21 +35,24 @@ class Blockchain:
         else:
             return None
 
-    def add_block(self, block, proof):
-        previous_hash = self.get_last_block.hash
-        if previous_hash != block.previous_hash:
+    def add_block(self, block, hash_received):
+        if len(block.previous_hash) > 1:
+            previous_hash = self.get_last_block.hash
+            if previous_hash != block.previous_hash:
+                print('hash faux')
+                return False
+
+        if not Blockchain.is_valid_proof(block, hash_received):
+            print('proof faux')
             return False
 
-        if not Blockchain.is_valid_proof(block, proof):
-            return False
-
-        block.hash = proof
+        block.hash = hash_received
 
         self.conn.execute('''
                     INSERT INTO blocks (num_block,hash,transactions,timestamp, previous_hash,nonce)
                             VALUES(?,?,?,?,?,?)
                               ''', (
-        block.index, block.hash, json.dumps(block.transactions), block.timestamp, block.previous_hash, block.nonce))
+            block.index, block.hash, json.dumps(block.transactions), block.timestamp, block.previous_hash, block.nonce))
         return True
 
     @staticmethod
@@ -79,12 +82,11 @@ class Blockchain:
                     transacVout = Vout(transacLine['to'],transacLine['from'], transacLine['amount'], transacLine['signature'], transacLine['message'], transacLine['timestamp']).__dict__
                     transacTemp = {}
                     transacTemp['transac'] = Transaction([], transacVout).__dict__
-                    #transacTemp['transac'].transfer(transacLine['from'], transacLine['to'], transacLine['amount'])
                 self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
         if 'miningReward' in transaction:
             self.unconfirmed_transactions['transac'].append(dict(transaction['miningReward']))
 
-        if self.get_size(self.unconfirmed_transactions) >= 15000 and not self.miningJob:
+        if self.get_size(self.unconfirmed_transactions) >= 1000 and not self.miningJob:
             self.miningJob = True
             return True
         else:
@@ -98,8 +100,6 @@ class Blockchain:
         obj_id = id(obj)
         if obj_id in seen:
             return 0
-        # Important mark as seen *before* entering recursion to gracefully handle
-        # self-referential objects
         seen.add(obj_id)
         if isinstance(obj, dict):
             size += sum([self.get_size(v, seen) for v in obj.values()])
@@ -111,13 +111,14 @@ class Blockchain:
         return size
 
     @classmethod
-    def is_valid_proof(cls, block, block_hash):
+    def is_valid_proof(cls, block, hash_received):
         """
         Check if block_hash is valid hash of block and satisfies
         the difficulty criteria.
         """
-        return (block_hash.startswith('0' * Blockchain.difficulty) and
-                block_hash == block.compute_hash())
+
+        return (hash_received.startswith('0' * Blockchain.difficulty) and
+                hash_received == block.compute_hash())
 
     @classmethod
     def check_chain_validity(cls, chain):
@@ -126,8 +127,6 @@ class Blockchain:
 
         for block in chain:
             block_hash = block.hash
-            # remove the hash field to recompute the hash again
-            # using `compute_hash` method.
             delattr(block, "hash")
 
             if not cls.is_valid_proof(block, block_hash) or \
@@ -153,7 +152,6 @@ class Blockchain:
                           transactions=self.unconfirmed_transactions,
                           timestamp=str(time.time()),
                           previous_hash=last_block.hash)
-
         proof = self.proof_of_work(new_block)
         self.add_block(new_block, proof)
         self.unconfirmed_transactions = {}
@@ -192,4 +190,3 @@ class Blockchain:
 
     def get_len_chain(self):
         return self.conn.execute('''SELECT MAX(id) FROM blocks''').fetchone()[0]
-

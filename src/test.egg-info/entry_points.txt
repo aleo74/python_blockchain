@@ -1,0 +1,5 @@
+[console_scripts]
+join = server.main:join
+restart = server.main:restart
+start = server.main:main
+
