@@ -9,7 +9,7 @@ from server.server import Server
 
 
 def generate_ECDSA_keys():
-    filename = input("Write the name of your new address: ") + ".txt"
+    filename = "server.txt"
     try:
         with open(filename, "r") as f:
             lines = f.read().splitlines()
