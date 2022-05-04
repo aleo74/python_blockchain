@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: test
-Version: 0.0.0.3ct
+Version: 0.0.0.4rev1
 Summary: Revoir le consensusAjouter un tableau pour les pending blockAjouter la possibilitee de miner des blocks en pending avec un mineur distant
 Home-page: UNKNOWN
 Author: UNKNOWN
