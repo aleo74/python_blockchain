@@ -85,12 +85,19 @@ class ClientThread(threading.Thread, MySocket):
                         self.clientsocket.send(str.encode(chain))
                     if msg['action'] == 'add_block':
                         block_data = msg['data']
-                        block = Block(block_data["index"],
-                                      json.loads(block_data["transactions"]),
-                                      block_data["timestamp"],
-                                      block_data["previous_hash"],
-                                      "",
-                                      block_data["nonce"])
+                        block = Block(index=block_data["index"],
+                                      transactions=json.loads(block_data["transactions"]),
+                                      timestamp=block_data["timestamp"],
+                                      previous_hash=block_data["previous_hash"],
+                                      difficulty=block_data["difficulty"],
+                                      reward=float(block_data["reward"]),
+                                      extra='',
+                                      fees=float(block_data["fees"]),
+                                      size=block_data["size"],
+                                      gaslimit=block_data["gaslimit"],
+                                      gasused=block_data["gasused"],
+                                      nonce=block_data["nonce"])
+
                         hash_received = block_data['hash']
                         added = self.blockchain.add_block(block, hash_received)
 

@@ -9,7 +9,7 @@ import json
 class Blockchain:
     difficulty = 1
 
-    def __init__(self, address_wallet_miner, fichier_db):
+    def __init__(self, address_wallet_miner, fichier_db, difficulty=1):
         self.unconfirmed_transactions = {}
         self.address_wallet_miner = address_wallet_miner
         self.chain = []
@@ -17,21 +17,42 @@ class Blockchain:
         self.conn = sqlite3.connect(fichier_db, check_same_thread=False, isolation_level=None)
         self.fichier = fichier_db
         self.miningJob = False
+        self.difficulty = difficulty
 
     def create_genesis_block(self):
-        genesis_block = Block(0, "", "", "0")
+        genesis_block = Block(index=0, hash="", transactions="", timestamp="", previous_hash="0", difficulty=self.difficulty,
+                              nonce=0, reward=0, gaslimit=80000000, gasused=0, size=0, extra='')
+        genesis_block.size = self.get_size(genesis_block)
+        genesis_block.reward = 100.0
+
         genesis_block.hash = self.proof_of_work(genesis_block)
-        test = self.conn.execute('''
-                INSERT INTO blocks (num_block,hash,transactions,timestamp, previous_hash,nonce)
-                        VALUES(?,?,?,?,?,?)
+        self.conn.execute('''
+                INSERT INTO blocks (num_block,hash,transactions,timestamp, previous_hash,nonce, difficulty, reward,
+                gaslimit, gasused, size, extra, fees)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                           ''', (
-            genesis_block.index, genesis_block.hash, json.dumps(genesis_block.transactions), genesis_block.timestamp, genesis_block.previous_hash, genesis_block.nonce))
+            genesis_block.index,
+            genesis_block.hash,
+            json.dumps(genesis_block.transactions),
+            genesis_block.timestamp,
+            genesis_block.previous_hash,
+            genesis_block.nonce,
+            genesis_block.difficulty,
+            genesis_block.reward,
+            genesis_block.gaslimit,
+            genesis_block.gasused,
+            genesis_block.size,
+            genesis_block.extra,
+            genesis_block.fees,)
+                          )
 
     @property
     def get_last_block(self):
-        myBlock = self.conn.execute('''SELECT * FROM blocks ORDER BY id DESC LIMIT 1''').fetchone()
-        if myBlock:
-            return Block(myBlock[1], myBlock[3], myBlock[4], myBlock[5], myBlock[2], myBlock[6])
+        block = self.conn.execute('''SELECT * FROM blocks ORDER BY id DESC LIMIT 1''').fetchone()
+        if block:
+            return Block(index=block[1], hash=block[2], transactions=block[3], timestamp=block[4], difficulty=block[5],
+                      previous_hash=block[6], nonce=block[7], reward=block[8], gaslimit=block[9], gasused=block[10],
+                      size=block[11], extra=block[12], fees=block[13])
         else:
             return None
 
@@ -41,18 +62,29 @@ class Blockchain:
             if previous_hash != block.previous_hash:
                 print('hash faux')
                 return False
-
         if not Blockchain.is_valid_proof(block, hash_received):
             print('proof faux')
             return False
-
         block.hash = hash_received
-
         self.conn.execute('''
-                    INSERT INTO blocks (num_block,hash,transactions,timestamp, previous_hash,nonce)
-                            VALUES(?,?,?,?,?,?)
+                    INSERT INTO blocks (num_block,hash,transactions,timestamp, previous_hash,nonce, difficulty, reward,
+                    gaslimit, gasused, size, extra, fees)
+                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                               ''', (
-            block.index, block.hash, json.dumps(block.transactions), block.timestamp, block.previous_hash, block.nonce))
+                    block.index,
+                    block.hash,
+                    json.dumps(block.transactions),
+                    block.timestamp,
+                    block.previous_hash,
+                    block.nonce,
+                    block.difficulty,
+                    block.reward,
+                    block.gaslimit,
+                    block.gasused,
+                    block.size,
+                    block.extra,
+                    block.fees,)
+                      )
         return True
 
     @staticmethod
@@ -79,7 +111,9 @@ class Blockchain:
         if 'transac' in transaction:
             for transacLine in transaction['transac']:
                 if float(transacLine['amount']) > 0:
-                    transacVout = Vout(transacLine['to'],transacLine['from'], transacLine['amount'], transacLine['signature'], transacLine['message'], transacLine['timestamp']).__dict__
+                    transacVout = Vout(transacLine['to'], transacLine['from'], transacLine['amount'],
+                                       transacLine['signature'], transacLine['message'],
+                                       transacLine['timestamp']).__dict__
                     transacTemp = {}
                     transacTemp['transac'] = Transaction([], transacVout).__dict__
                 self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
@@ -116,8 +150,7 @@ class Blockchain:
         Check if block_hash is valid hash of block and satisfies
         the difficulty criteria.
         """
-
-        return (hash_received.startswith('0' * Blockchain.difficulty) and
+        return (hash_received.startswith('0' * block.difficulty) and
                 hash_received == block.compute_hash())
 
     @classmethod
@@ -142,7 +175,6 @@ class Blockchain:
 
         if not self.unconfirmed_transactions:
             return False
-
         last_block = self.get_last_block
         rewardT = Vout(self.address_wallet_miner, "", self.rewardCalcul(), "", "", time.time()).__dict__
         reward = {}
@@ -151,12 +183,16 @@ class Blockchain:
         new_block = Block(index=last_block.index + 1,
                           transactions=self.unconfirmed_transactions,
                           timestamp=str(time.time()),
-                          previous_hash=last_block.hash)
+                          previous_hash=last_block.hash,
+                          difficulty=1,
+                          reward=float(self.rewardCalcul()),
+                          extra='',
+                          fees=float(self.calcul_fees()))
+        new_block.size = self.get_size(new_block)
         proof = self.proof_of_work(new_block)
         self.add_block(new_block, proof)
         self.unconfirmed_transactions = {}
         self.miningJob = False
-
         return True
 
     def rewardCalcul(self):
@@ -170,22 +206,32 @@ class Blockchain:
             div = div + 1
         return max_reward
 
+    def calcul_fees(self):
+        return 0
+
     def get_block_by_index(self, index):
-        myBlock = self.conn.execute('''SELECT * FROM blocks WHERE num_block=?''', (index,)).fetchone()
-        if myBlock:
-            return Block(myBlock[1], myBlock[3], myBlock[4], myBlock[5], myBlock[2], myBlock[6]).__dict__
+        block = self.conn.execute('''SELECT * FROM blocks WHERE num_block=?''', (index,)).fetchone()
+        if block:
+            return Block(index=block[1], hash=block[2], transactions=block[3], timestamp=block[4], difficulty=block[5],
+                      previous_hash=block[6], nonce=block[7], reward=block[8], gaslimit=block[9], gasused=block[10],
+                      size=block[11], extra=block[12], fees=block[13]).__dict__
         else:
             return 'None'
 
     def find_block_by_hash(self, hash):
-        myBlock = self.conn.execute('''SELECT * FROM blocks WHERE hash=?''', (hash,)).fetchone()
-        return Block(myBlock[1], myBlock[3], myBlock[4], myBlock[5], myBlock[2], myBlock[6]).__dict__
+        block = self.conn.execute('''SELECT * FROM blocks WHERE hash=?''', (hash,)).fetchone()
+        return Block(index=block[1], hash=block[2], transactions=block[3], timestamp=block[4], difficulty=block[5],
+                      previous_hash=block[6], nonce=block[7], reward=block[8], gaslimit=block[9], gasused=block[10],
+                      size=block[11], extra=block[12], fees=block[13]).__dict__
 
     def get_chain(self):
         list_block = []
         myBlock = self.conn.execute('''SELECT * FROM blocks''').fetchall()
         for block in myBlock:
-            list_block.append(Block(block[1], block[3], block[4], block[5], block[2], block[6]).__dict__)
+            list_block.append(
+                Block(index=block[1], hash=block[2], transactions=block[3], timestamp=block[4], difficulty=block[5],
+                      previous_hash=block[6], nonce=block[7], reward=block[8], gaslimit=block[9], gasused=block[10],
+                      size=block[11], extra=block[12], fees=block[13]).__dict__)
         return list_block
 
     def get_len_chain(self):

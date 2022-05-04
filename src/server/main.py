@@ -4,8 +4,10 @@ import os
 import argparse
 import base64
 import ecdsa
+import hashlib
 from blockchain.blockchain import Blockchain
 from server.server import Server
+from bech32 import bech32_encode, convertbits
 
 
 def generate_ECDSA_keys():
@@ -14,31 +16,48 @@ def generate_ECDSA_keys():
         with open(filename, "r") as f:
             lines = f.read().splitlines()
             public_key = lines[1].split(": ")[1]
+            public_key_bytes = bytes.fromhex(public_key)
+            s = hashlib.new("sha256", public_key_bytes).digest()
+            r = hashlib.new("ripemd160", s).digest()
+            five_bit_r = convertbits(r, 8, 5)
+            assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
+            address = bech32_encode("TC", five_bit_r)
+            print(address)
     except FileNotFoundError:
         sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)  # this is your sign (private key)
         private_key = sk.to_string().hex()  # convert your private key to hex
         vk = sk.get_verifying_key()  # this is your verification key (public key)
-        public_key = vk.to_string().hex()
-        # we are going to encode the public key to make it shorter
-        public_key = base64.b64encode(bytes.fromhex(public_key))
+        public_key = vk.to_string("compressed").hex()
         with open(filename, "w") as f:
-            f.write("Private key: {0}\nWallet address / Public key: {1}".format(private_key, public_key.decode()))
+            f.write("Private key: {0}\nWallet address / Public key: {1}".format(private_key, public_key))
         print("Your new address and private key are now in the file {0}".format(filename))
         print("copy this file to a secure directory, and delete your private key from the original")
-        public_key = public_key.decode()
-    return public_key
+
+        public_key_bytes = bytes.fromhex(public_key)
+        s = hashlib.new("sha256", public_key_bytes).digest()
+        r = hashlib.new("ripemd160", s).digest()
+        five_bit_r = convertbits(r, 8, 5)
+        assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
+        address = bech32_encode("TC", five_bit_r)
+    return address
 
 
 sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS blocks (
-                                    id integer PRIMARY KEY,
+                                    id integer PRIMARY KEY, 
                                     num_block integer NOT NULL,
                                     hash text,
                                     transactions text,
                                     timestamp text,
+                                    difficulty bigint, 
                                     previous_hash text not null,
-                                    nonce integer
+                                    nonce bigint,
+                                    reward float,
+                                    gaslimit integer,
+                                    gasused integer, 
+                                    size integer,
+                                    extra text,
+                                    fees float
                                 );"""
-
 
 def create_connection(db_file):
     """ create a database connection to a SQLite database """
@@ -97,7 +116,7 @@ def restart():
 
 
 def join():
-    fichier_db = r".\db\pythonsqlite2.db"
+    fichier_db = r".\db\pythonsqlite.db"
     if os.path.exists(fichier_db):
         os.remove(fichier_db)
     parser = argparse.ArgumentParser()

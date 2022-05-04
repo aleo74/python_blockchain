@@ -6,6 +6,7 @@ from client.client import ClientThread
 from socket import *
 import threading
 import json
+import time
 
 
 class ErrorLevels:
@@ -69,29 +70,46 @@ class Server(threading.Thread):
             self.register_in_network = True
         s.close()
 
-    def recvall(self, sock):
-        BUFF_SIZE = 2048  # 1 KiB
+    def recvall(self, sock,timeout=2):
+        sock.setblocking(0)
+        part = b''
         data = b''
-        while True:
-            part = sock.recv(BUFF_SIZE)
-            data += part
-            if len(part) < BUFF_SIZE:
-                # either 0 or end of data
+        begin = time.time()
+        while 1:
+            # if you got some data, then break after wait sec
+            if part and time.time() - begin > timeout:
                 break
+            # if you got no data at all, wait a little longer
+            elif time.time() - begin > timeout * 2:
+                break
+            try:
+                part = sock.recv(8192)
+                if part:
+                    data += part
+                    begin = time.time()
+                else:
+                    time.sleep(0.1)
+            except:
+                pass
         return data
-
     def close(self):
         self.running = False
 
     def create_chain_from_dump(self, chain_dump):
         for idx, block_data in enumerate(chain_dump):
-            block = Block(int(block_data["index"]),
-                          json.loads(block_data["transactions"]),
-                          block_data["timestamp"],
-                          block_data["previous_hash"],
-                          "",
-                          int(block_data["nonce"]))
-
+            block = Block(index=int(block_data["index"]),
+                          transactions=json.loads(block_data["transactions"]),
+                          timestamp=block_data["timestamp"],
+                          previous_hash=block_data["previous_hash"],
+                          difficulty=int(block_data["difficulty"]),
+                          nonce=int(block_data["nonce"]),
+                          reward=float(block_data["reward"]),
+                          gaslimit=int(block_data["gaslimit"]),
+                          gasused=int(block_data["gasused"]),
+                          size=int(block_data["size"]),
+                          extra=block_data["extra"],
+                          fees=float(block_data["fees"]),
+                          )
             proof = block_data['hash']
             added = self.blockchain.add_block(block, proof)
             if not added:

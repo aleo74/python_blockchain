@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='test',
-    version='0.0.0.3ct',
+    version='0.0.0.4rev1',
     description='Revoir le consensus'
                 'Ajouter un tableau pour les pending block'
                 'Ajouter la possibilitee de miner des blocks en pending avec un mineur distant',
