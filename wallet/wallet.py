@@ -11,6 +11,23 @@ from bech32 import bech32_encode, convertbits
 import hashlib
 import eth_keys, eth_utils, binascii, os
 
+class Vout():
+    def __init__(self, receiver, sender, amount, message, timestamp):
+        self.receiver = receiver
+        self.sender = sender
+        self.amount = amount
+        self.signature = ''
+        self.message = message
+        self.timestamp = timestamp
+        # self.lockSig = lockSig
+
+    @staticmethod
+    def sign(transaction, private_key):
+        signerPrivKey = private_key
+        dict = transaction.__dict__
+        return signerPrivKey.sign_msg(str(dict))
+
+
 class Wallet():
 
     def __init__(self, address="", privateKey=""):
@@ -73,7 +90,6 @@ class Wallet():
 
 
     def connect_wallet(self):
-
         self.privateKey = eth_keys.keys.PrivateKey(binascii.unhexlify(self.privateKey[2:]))
         print(self.privateKey)
         public_key = self.privateKey.public_key
@@ -90,7 +106,6 @@ class Wallet():
             return False
 
     def send_transaction(self, addr_to, amount):
-
         if len(self.privateKey) == 64 and self.amount <= float(amount):
             timeS = str(round(time.time()))
             s = socket(AF_INET, SOCK_STREAM)

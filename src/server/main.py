@@ -22,23 +22,22 @@ def generate_ECDSA_keys():
             five_bit_r = convertbits(r, 8, 5)
             assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
             address = bech32_encode("TC", five_bit_r)
-            print(address)
     except FileNotFoundError:
-        sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)  # this is your sign (private key)
-        private_key = sk.to_string().hex()  # convert your private key to hex
-        vk = sk.get_verifying_key()  # this is your verification key (public key)
-        public_key = vk.to_string("compressed").hex()
+        privateKey = eth_keys.keys.PrivateKey(os.urandom(32))
+        publicKey = privateKey.public_key
+        s = hashlib.new("sha256", str(publicKey).encode('utf-8')).digest()
+        r = hashlib.new("ripemd160", s).digest()
+        assert convertbits(r, 8, 5) is not None, "Unsuccessful bech32.convertbits call"
+        address = bech32_encode("TC", convertbits(r, 8, 5))
+
+        filename = input("Write the name of your new address: ") + ".txt"
         with open(filename, "w") as f:
-            f.write("Private key: {0}\nWallet address / Public key: {1}".format(private_key, public_key))
+            f.write("Private key: {0}\nWallet address / Public key: {1}\nyour address: {2}".format(privateKey,
+                                                                                                   publicKey,
+                                                                                                   address))
         print("Your new address and private key are now in the file {0}".format(filename))
         print("copy this file to a secure directory, and delete your private key from the original")
-
-        public_key_bytes = bytes.fromhex(public_key)
-        s = hashlib.new("sha256", public_key_bytes).digest()
-        r = hashlib.new("ripemd160", s).digest()
-        five_bit_r = convertbits(r, 8, 5)
-        assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
-        address = bech32_encode("TC", five_bit_r)
+    print(address)
     return address
 
 
