@@ -40,6 +40,9 @@ class Vout():
                     unspent.append(vout)
         return [Vin(tx['hash'], tx['amount']) for tx in unspent]
 
+    def verify(self):
+        pass
+
 
 class Transaction():
     def __init__(self, vin, vout, ):
