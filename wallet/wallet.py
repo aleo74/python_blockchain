@@ -15,17 +15,23 @@ class Vout():
     def __init__(self, receiver, sender, amount, message, timestamp):
         self.receiver = receiver
         self.sender = sender
-        self.amount = amount
+        self.amount = float(amount)
         self.signature = ''
         self.message = message
         self.timestamp = timestamp
-        # self.lockSig = lockSig
+        self.hash = ''
 
     @staticmethod
     def sign(transaction, private_key):
         signerPrivKey = private_key
         dict = transaction.__dict__
-        return signerPrivKey.sign_msg(str(dict))
+        strDict = str(dict)
+        return signerPrivKey.sign_msg(strDict.encode('utf-8'))
+
+    def generate_hash(self):
+        self.hash = hashlib.sha256(
+            (str(self.timestamp) + str(self.receiver) + str(self.sender) + str(self.message) + str(self.signature) + str(
+                self.amount)).encode('utf-8')).hexdigest()
 
 
 class Wallet():
@@ -87,11 +93,8 @@ class Wallet():
         print("copy this file to a secure directory, and delete your private key from the original")
         return self.address
 
-
-
     def connect_wallet(self):
         self.privateKey = eth_keys.keys.PrivateKey(binascii.unhexlify(self.privateKey[2:]))
-        print(self.privateKey)
         public_key = self.privateKey.public_key
         s = hashlib.new("sha256", str(public_key).encode('utf-8')).digest()
         r = hashlib.new("ripemd160", s).digest()
@@ -106,19 +109,20 @@ class Wallet():
             return False
 
     def send_transaction(self, addr_to, amount):
-        if len(self.privateKey) == 64 and self.amount <= float(amount):
-            timeS = str(round(time.time()))
+        if len(self.privateKey) == 64:
             s = socket(AF_INET, SOCK_STREAM)
             server_address = ('127.0.0.1', 1122)
             s.connect(server_address)
-            msg = '{"action": "new_transaction", "transac":[{ "timestamp": "'+str(time.time())+'", "from" : "' + self.address + '", "to" : "' + addr_to + '", "amount": "' + amount + '", "signature" : "' + signature.decode("utf-8") + '", "message": "' + message + '"}]}'
-            s.send(msg.encode())
+            message = ''
+            vout = Vout(addr_to, self.address, amount, message, str(time.time()))
+            signature = Vout.sign(vout, self.privateKey)
+            vout.signature = str(signature)
+            vout.generate_hash()
+            msg = '{"action": "new_transaction", "transac":['+json.dumps(vout.__dict__)+']}'
             print(msg)
+            s.send(msg.encode())
         else:
-            print("Wrong address or key length! Verify and try again.")
-
-    def sign(self, message):
-        return self.publicKey.sign_msg(message)
+            print('NOPE')
 
 
 
@@ -157,6 +161,8 @@ if response == "2":
 
     my_wallet = Wallet(public_addr, private_key)
     connect = my_wallet.connect_wallet()
+    my_wallet.send_transaction('TC14cr0tntxhs358qwz0twwhupvczr2nf8klz03y0', 10)
+    exit()
 if response == "1":
     my_wallet = Wallet()
     my_wallet.create_new_wallet()
@@ -180,61 +186,3 @@ if connect == True:
         elif response == "2":
             amount = my_wallet.check_transactions()
             print(f"{amount:.4f}")
-
-
-
-
-# # Generate the private + public key pair (using the secp256k1 curve)
-# signerPrivKey = eth_keys.keys.PrivateKey(os.urandom(32))
-# signerPubKey = signerPrivKey.public_key
-# print('Private key (64 hex digits):', signerPrivKey)
-# print('Public key (uncompressed, 128 hex digits):', signerPubKey)
-#
-#
-# # ECDSA sign message (using the curve secp256k1 + Keccak-256)
-# msg = b'Message for signing'
-# signature = signerPrivKey.sign_msg(msg)
-# print('Message:', msg)
-# print('Signature: [r = {0}, s = {1}, v = {2}]'.format(
-#     hex(signature.r), hex(signature.s), hex(signature.v)))
-#
-# # ECDSA public key recovery from signature + verify signature
-# # (using the curve secp256k1 + Keccak-256 hash)
-# print(signature)
-# print(hex(signature))
-# msg = b'Message for signing'
-# recoveredPubKey = signature.recover_public_key_from_msg(msg)
-# print('Recovered public key (128 hex digits):', recoveredPubKey)
-# print('Public key correct?', recoveredPubKey == signerPubKey)
-# valid = signerPubKey.verify_msg(msg, signature)
-# print("Signature valid?", valid)
-#
-#
-#
-# s = hashlib.new("sha256", str(signerPubKey).encode('utf-8')).digest()
-# r = hashlib.new("ripemd160", s).digest()
-# five_bit_r = convertbits(r, 8, 5)
-# assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
-# address = bech32_encode("TC", five_bit_r)
-# print(address)
-
-
-# msg = b'Message for signing'
-# signature = signerPrivKey.sign_msg(msg)
-#
-# print('Msg:', msg)
-# print('Msg hash:', binascii.hexlify(msgHash))
-# print('Signature: [v = {0}, r = {1}, s = {2}]'.format(
-#   hex(signature.v), hex(signature.r), hex(signature.s)))
-# print('Signature (130 hex digits):', signature)
-#
-#
-# msg = b'Message for signing'
-# msgSigner = '0xa44f70834a711F0DF388ab016465f2eEb255dEd0'
-# signature = eth_keys.keys.Signature(binascii.unhexlify(
-#     '6f0156091cbe912f2d5d1215cc3cd81c0963c8839b93af60e0921b61a19c54300c71006dd93f3508c432daca21db0095f4b16542782b7986f48a5d0ae3c583d401'))
-# signerPubKey = signature.recover_public_key_from_msg(msg)
-# print('Signer public key (recovered):', signerPubKey)
-# signerAddress = signerPubKey.to_checksum_address()
-# print('Signer address:', signerAddress)
-# print('Signature valid?:', signerAddress == msgSigner)

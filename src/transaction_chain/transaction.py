@@ -12,16 +12,14 @@ class Vin():
 
 
 class Vout():
-    def __init__(self, receiver, sender, amount, signature, message, timestamp):
+    def __init__(self, receiver, sender, amount, message, timestamp):
         self.receiver = receiver
         self.sender = sender
-        self.amount = amount
-        self.signature = signature
+        self.amount = float(amount)
+        self.signature = ''
         self.message = message
         self.timestamp = timestamp
-        self.hash = hashlib.sha256(
-            (str(time.time()) + str(self.receiver) + str(self.sender) + str(self.message) + str(self.signature) + str(self.amount)).encode('utf-8')).hexdigest()
-        # self.lockSig = lockSig
+        self.hash = ''
 
     @classmethod
     def get_unspent(cls, addr):
@@ -40,8 +38,17 @@ class Vout():
                     unspent.append(vout)
         return [Vin(tx['hash'], tx['amount']) for tx in unspent]
 
-    def verify(self):
-        pass
+    @staticmethod
+    def sign(transaction, private_key):
+        signerPrivKey = private_key
+        dict = transaction.__dict__
+        strDict = str(dict)
+        return signerPrivKey.sign_msg(strDict.encode('utf-8'))
+
+    def generate_hash(self):
+        self.hash = hashlib.sha256(
+            (str(self.timestamp) + str(self.receiver) + str(self.sender) + str(self.message) + str(self.signature) + str(
+                self.amount)).encode('utf-8')).hexdigest()
 
 
 class Transaction():

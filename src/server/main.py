@@ -8,6 +8,7 @@ import hashlib
 from blockchain.blockchain import Blockchain
 from server.server import Server
 from bech32 import bech32_encode, convertbits
+import eth_keys, eth_utils, binascii, os
 
 
 def generate_ECDSA_keys():

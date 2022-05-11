@@ -4,6 +4,9 @@ import time
 from transaction_chain.transaction import Vout, Transaction
 import sqlite3
 import json
+from bech32 import bech32_encode, convertbits
+import hashlib
+import eth_keys, eth_utils, binascii, os
 
 
 class Blockchain:
@@ -94,7 +97,6 @@ class Blockchain:
         that satisfies our difficulty criteria.
         """
         block.nonce = 0
-
         computed_hash = block.compute_hash()
         while not computed_hash.startswith('0' * Blockchain.difficulty):
             block.nonce += 1
@@ -111,12 +113,27 @@ class Blockchain:
         if 'transac' in transaction:
             for transacLine in transaction['transac']:
                 if float(transacLine['amount']) > 0:
-                    transacVout = Vout(transacLine['to'], transacLine['from'], transacLine['amount'],
-                                       transacLine['signature'], transacLine['message'],
-                                       transacLine['timestamp']).__dict__
-                    transacTemp = {}
-                    transacTemp['transac'] = Transaction([], transacVout).__dict__
-                self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
+                    transacVout = Vout(transacLine['receiver'], transacLine['sender'], transacLine['amount'],
+                                       transacLine['message'],
+                                       transacLine['timestamp'])
+                    hash_transac = transacLine['hash']
+                    signature_transac = transacLine['signature']
+                    signature_to_verify = eth_keys.keys.Signature(binascii.unhexlify(
+                             signature_transac[2:]))
+                    vout_to_verify = str(transacVout.__dict__)
+                    signerPubKey = signature_to_verify.recover_public_key_from_msg(vout_to_verify.encode('utf-8'))
+                    s = hashlib.new("sha256", str(signerPubKey).encode('utf-8')).digest()
+                    r = hashlib.new("ripemd160", s).digest()
+                    five_bit_r = convertbits(r, 8, 5)
+                    assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
+                    addresssignataire = bech32_encode("TC", five_bit_r)
+                    if addresssignataire == transacLine['sender']:
+                        transacVout.signature = str(signature_transac)
+                        transacVout.generate_hash()
+                        if hash_transac == transacVout.hash:
+                            transacTemp = {}
+                            transacTemp['transac'] = Transaction([], transacVout.__dict__).__dict__
+                            self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
         if 'miningReward' in transaction:
             self.unconfirmed_transactions['transac'].append(dict(transaction['miningReward']))
 
@@ -172,11 +189,10 @@ class Blockchain:
         return result
 
     def mine(self):
-
         if not self.unconfirmed_transactions:
             return False
         last_block = self.get_last_block
-        rewardT = Vout(self.address_wallet_miner, "", self.rewardCalcul(), "", "", time.time()).__dict__
+        rewardT = Vout(self.address_wallet_miner, "", self.rewardCalcul(), "MiningReward", str(time.time())).__dict__
         reward = {}
         reward['miningReward'] = Transaction([], rewardT).__dict__
         self.add_new_transaction(reward)

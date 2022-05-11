@@ -56,9 +56,7 @@ class ClientThread(threading.Thread, MySocket):
                         if 'transac' in msg:
                             tx_data['transac'] = []
                             for transac in msg['transac']:
-                                transac["timestamp"] = time.time()
                                 tx_data['transac'].append(transac)
-
                         mining = self.blockchain.add_new_transaction(tx_data)
                         self.clientsocket.send(bytes([self.blockchain.get_last_block.index]))
                         if mining:
@@ -136,7 +134,6 @@ class ClientThread(threading.Thread, MySocket):
         self.clientsocket.close()
 
     def announce_new_block(self, block):
-        print('annonce block')
         for peer in self.peers.get_peers():
             if peer == self.server:
                 print('mon propre server')
