@@ -121,6 +121,7 @@ class Blockchain:
                     signature_to_verify = eth_keys.keys.Signature(binascii.unhexlify(
                              signature_transac[2:]))
                     vout_to_verify = str(transacVout.__dict__)
+                    print(vout_to_verify)
                     signerPubKey = signature_to_verify.recover_public_key_from_msg(vout_to_verify.encode('utf-8'))
                     s = hashlib.new("sha256", str(signerPubKey).encode('utf-8')).digest()
                     r = hashlib.new("ripemd160", s).digest()
@@ -128,9 +129,11 @@ class Blockchain:
                     assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
                     addresssignataire = bech32_encode("TC", five_bit_r)
                     if addresssignataire == transacLine['sender']:
+                        print('ok')
                         transacVout.signature = str(signature_transac)
                         transacVout.generate_hash()
                         if hash_transac == transacVout.hash:
+                            print('hash ok')
                             transacTemp = {}
                             transacTemp['transac'] = Transaction([], transacVout.__dict__).__dict__
                             self.unconfirmed_transactions['transac'].append(dict(transacTemp['transac']))
@@ -138,6 +141,7 @@ class Blockchain:
             self.unconfirmed_transactions['transac'].append(dict(transaction['miningReward']))
 
         if self.get_size(self.unconfirmed_transactions) >= 1000 and not self.miningJob:
+            print('minig time')
             self.miningJob = True
             return True
         else:

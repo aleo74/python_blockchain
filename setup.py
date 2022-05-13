@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='Tomato-blockchain',
-    version='0.0.0.4rev2',
+    version='0.0.0.4aarev2',
     description='Revoir le consensus'
                 'Ajouter un tableau pour les pending block'
                 'Ajouter la possibilitee de miner des blocks en pending avec un mineur distant'
