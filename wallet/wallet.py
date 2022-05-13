@@ -11,6 +11,8 @@ from bech32 import bech32_encode, convertbits
 import hashlib
 import eth_keys, eth_utils, binascii, os
 
+CONNECT = ('127.0.0.1', 1122)
+
 class Vout():
     def __init__(self, receiver, sender, amount, message, timestamp):
         self.receiver = receiver
@@ -45,7 +47,7 @@ class Wallet():
 
     def check_transactions(self):
         s = socket(AF_INET, SOCK_STREAM)
-        server_address = ('127.0.0.1', 1122)
+        server_address = CONNECT
         s.connect(server_address)
         msg = '{"action": "get_chain"}'
         s.send(msg.encode())
@@ -111,7 +113,7 @@ class Wallet():
     def send_transaction(self, addr_to, amount):
         if len(self.privateKey) == 64:
             s = socket(AF_INET, SOCK_STREAM)
-            server_address = ('127.0.0.1', 1122)
+            server_address = CONNECT
             s.connect(server_address)
             message = ''
             vout = Vout(addr_to, self.address, amount, message, str(time.time()))
@@ -161,6 +163,7 @@ if response == "2":
 
     my_wallet = Wallet(public_addr, private_key)
     connect = my_wallet.connect_wallet()
+
 
 if response == "1":
     my_wallet = Wallet()
