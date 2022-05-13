@@ -153,16 +153,15 @@ response = input("""What do you want to do?
 
 
 if response == "2":
-    # public_addr = input("From: introduce your wallet address or public key\n")
-    # private_key = input("Introduce your private key\n")
+    public_addr = input("From: introduce your wallet address or public key\n")
+    private_key = input("Introduce your private key\n")
     # For fast debugging
-    public_addr = "TC1d9sxn02q2f9hd3zy72d4r8e7zj0azmq02gszpt"
-    private_key = "0x5f80a8070d9b9220a910f97120e3018d119c1335af9bae15071a0a6f2fad8df8"
+    # public_addr = ""
+    # private_key = ""
 
     my_wallet = Wallet(public_addr, private_key)
     connect = my_wallet.connect_wallet()
-    my_wallet.send_transaction('TC14cr0tntxhs358qwz0twwhupvczr2nf8klz03y0', 10)
-    exit()
+
 if response == "1":
     my_wallet = Wallet()
     my_wallet.create_new_wallet()
