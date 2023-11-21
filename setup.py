@@ -21,7 +21,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'start = server.main:main',
+            'run = server.main:main',
             'restart = server.main:restart',
             'join = server.main:join',
         ]

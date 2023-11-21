@@ -23,8 +23,6 @@ def generate_ECDSA_keys():
             five_bit_r = convertbits(r, 8, 5)
             assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
             address = bech32_encode("TC", five_bit_r)
-            if address == lines[2].split(": ")[1]:
-                print('ok')
     except FileNotFoundError:
         privateKey = eth_keys.keys.PrivateKey(os.urandom(32))
         publicKey = privateKey.public_key
@@ -67,7 +65,7 @@ def create_connection(db_file):
     try:
         conn = sqlite3.connect(db_file)
     except Error as e:
-        print(e)
+        print("Error creating connection:", e)
     return conn
 
 
