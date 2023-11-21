@@ -16,13 +16,15 @@ def generate_ECDSA_keys():
     try:
         with open(filename, "r") as f:
             lines = f.read().splitlines()
-            public_key = lines[1].split(": ")[1]
-            public_key_bytes = bytes.fromhex(public_key)
-            s = hashlib.new("sha256", public_key_bytes).digest()
+            private_key = eth_keys.keys.PrivateKey(binascii.unhexlify(lines[0].split(": ")[1][2:]))
+            public_key = private_key.public_key
+            s = hashlib.new("sha256", str(public_key).encode('utf-8')).digest()
             r = hashlib.new("ripemd160", s).digest()
             five_bit_r = convertbits(r, 8, 5)
             assert five_bit_r is not None, "Unsuccessful bech32.convertbits call"
             address = bech32_encode("TC", five_bit_r)
+            if address == lines[2].split(": ")[1]:
+                print('ok')
     except FileNotFoundError:
         privateKey = eth_keys.keys.PrivateKey(os.urandom(32))
         publicKey = privateKey.public_key
@@ -31,7 +33,7 @@ def generate_ECDSA_keys():
         assert convertbits(r, 8, 5) is not None, "Unsuccessful bech32.convertbits call"
         address = bech32_encode("TC", convertbits(r, 8, 5))
 
-        filename = input("Write the name of your new address: ") + ".txt"
+        filename = "server.txt"
         with open(filename, "w") as f:
             f.write("Private key: {0}\nWallet address / Public key: {1}\nyour address: {2}".format(privateKey,
                                                                                                    publicKey,
