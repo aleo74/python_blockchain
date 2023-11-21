@@ -1,0 +1,14 @@
+version: "3.10"
+services:
+  app:
+    container_name: PythonBlockChain
+    build: .
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    ports:
+      - "50001:50001"
+    volumes:
+      - type: bind
+        source: .
+        target: /app
