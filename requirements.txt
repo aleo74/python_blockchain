@@ -1,6 +1,6 @@
 bech32==1.2.0
 cytoolz==0.12.2
-ecdsa==0.18.0
+ecdsa==0.19.2
 eth-hash==0.5.2
 eth-keys==0.4.0
 eth-typing==3.5.2
